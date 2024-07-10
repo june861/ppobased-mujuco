@@ -10,7 +10,7 @@ defaults:
 
 ###################################################################################################
 
-solve_dir_from_cwd: "outputs/rlc/solve/atari-ppo/baselines/2024-02-18_23-39-14-463716"
+solve_dir_from_cwd: "outputs/release/solve/atari-ppo/baselines/2024-04-05_23-18-42-112955"
 capacity:
   num_epochs: 1
   num_envs: 1                     # Sampled to the full original evaluation limit.

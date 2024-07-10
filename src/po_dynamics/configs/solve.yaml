@@ -67,6 +67,7 @@ optim:
   reset_state: False  # Reset the optimizer running means.
   kwargs:
     lr: 1e-5
+    betas: [0.9, 0.999]
   anneal_linearly: False
   policy:
     algo: ${optim.algo}
@@ -74,6 +75,7 @@ optim:
     reset_state: ${optim.reset_state}
     kwargs:
       lr: ${optim.kwargs.lr}
+      betas: ${optim.kwargs.betas}
     anneal_linearly: ${optim.anneal_linearly}
   value:
     algo: ${optim.algo}
@@ -81,6 +83,7 @@ optim:
     reset_state: ${optim.reset_state}
     kwargs:
       lr: ${optim.kwargs.lr}
+      betas: ${optim.kwargs.betas}
     anneal_linearly: ${optim.anneal_linearly}
 
 target_estimator_kwargs:

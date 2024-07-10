@@ -17,7 +17,7 @@ Contents of this directory:
 
 ```text
 .
-├── rlc   # All runs in in this project are wandb sweeps. Names are self-explanatory.
+├── release   # All runs in in this project are wandb sweeps. Names are self-explanatory.
 │   ├── atari-ppo
 │   │   ├── baselines.yaml
 │   │   ├── capacity-all.yaml

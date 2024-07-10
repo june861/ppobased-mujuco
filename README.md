@@ -96,7 +96,7 @@ Below, we give a description of the main files and directories in this repositor
         └── toy_problem.py              # Script to run the toy setting of Figure 5.
 
     └─── cleanrl/                       # Scripts to mimic our implementation in CleanRL (has very limited features).
-          ├                             # Used to reproduce and verify that our implementation doesn't have a random bug.
+                                          # Used to reproduce and verify that our implementation doesn't have a random bug.
           ├── ppo_atari_original.py     # CleanRL's PPO implementation.
           ├── ppo_atari.py              # Modified CleanRL's PPO to have the same setting as out codebase.
           ├── ppo_atari_2models.py      # Same but with separate actor and critic.

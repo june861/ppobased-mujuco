@@ -30,16 +30,17 @@ runai submit \
 # For MuJoCo rendering use -e DISPLAY=:99
 # MuJoCo - training
 runai submit \
---name no-representation-no-trust-mujoco \
---image registry.rcp.epfl.ch/claire/moalla/no-representation-no-trust:run-latest-moalla \
---pvc runai-claire-moalla-scratch:/claire-rcp-scratch \
--e PROJECT_ROOT_AT=/claire-rcp-scratch/home/moalla/no-representation-no-trust/run \
--e WANDB_API_KEY_FILE_AT=/claire-rcp-scratch/home/moalla/.wandb-api-key-anonymous \
--e WANDB_CONSOLE=off \
--e WANDB_DISABLE_GIT=1 \
--e OMP_NUM_THREADS=4 \
---cpu 54 --node-type S8 --large-shm \
--- something
+  --name no-representation-no-trust-mujoco \
+  --image registry.rcp.epfl.ch/claire/moalla/no-representation-no-trust:run-latest-moalla \
+  --pvc runai-claire-moalla-scratch:/claire-rcp-scratch \
+  -e PROJECT_ROOT_AT=/claire-rcp-scratch/home/moalla/no-representation-no-trust/run \
+  -e WANDB_API_KEY_FILE_AT=/claire-rcp-scratch/home/moalla/.wandb-api-key-anonymous \
+  -e WANDB_CONSOLE=off \
+  -e WANDB_DISABLE_GIT=1 \
+  -e OMP_NUM_THREADS=4 \
+  --cpu 48 --node-type S8 --large-shm \
+  -- zsh reproducibility-scripts/utils/run-in-parallel.sh 8 wandb agent ...
+
 
 # MuJoCo - capacity
 runai submit \

@@ -144,8 +144,8 @@ data/*
 outputs/*
 !outputs/README.md
 !outputs/github-figures
-!outputs/rlconf-plotting/plots/.placeholder
-!outputs/rlconf-plotting/combined-raw-logs/.placeholder
+!outputs/release-plotting/plots/.placeholder
+!outputs/release-plotting/combined-raw-logs/.placeholder
 
 third-party/*
 !third-party/.placeholder

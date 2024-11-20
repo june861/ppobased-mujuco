@@ -6,7 +6,7 @@ Clone the git repository.
 
 ```bash
 # Clone with SSH or HTTPS.
-git clone git@github.com:CLAIRE-Labo/no-representation-no-trust.git no-representation-no-trust
+git clone git@github.com:CLAIRE-Labo/no-representation-no-trust.git
 cd no-representation-no-trust
 ```
 

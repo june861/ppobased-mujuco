@@ -1,18 +1,34 @@
 # No Representation, No Trust: Connecting Representation, Collapse, and Trust Issues in PPO
 
-**Skander Moalla (EPFL), Andrea Miele (EPFL), Razvan Pascanu (Google DeepMind), Caglar Gulcehre (EPFL)**
+**Skander Moalla (EPFL), Andrea Miele (EPFL), Daniil Pyatko (EPFL), Razvan Pascanu (Google DeepMind), Caglar Gulcehre (EPFL)**
 
-**Paper**: [https://arxiv.org/abs/2405.00662](https://arxiv.org/abs/2405.00662)
+**Paper**: [https://openreview.net/forum?id=Wy9UgrMwD0](https://openreview.net/forum?id=Wy9UgrMwD0)
 
 ## Abstract
 
-Reinforcement learning (RL) is inherently rife with non-stationarity since the states and rewards the agent observes during training depend on its changing policy.
+Reinforcement learning (RL)
+is inherently rife with non-stationarity since the states and rewards the agent observes
+during training depend on its changing policy.
 Therefore, networks in deep RL must be capable of adapting to new observations and fitting new targets.
-However, previous works have observed that networks in off-policy deep value-based methods exhibit a decrease in representation rank, often correlated with an inability to continue learning or a collapse in performance.
-Although this phenomenon has generally been attributed to neural network learning under non-stationarity, it has been overlooked in on-policy policy optimization methods which are often thought capable of training indefinitely.
-In this work, we empirically study representation dynamics in Proximal Policy Optimization (PPO) on the Atari and MuJoCo environments, revealing that PPO agents are also affected by feature rank deterioration and loss of plasticity.
-We show that this is aggravated with stronger non-stationarity, ultimately driving the actor's performance to collapse, regardless of the performance of the critic.
-We draw connections between representation collapse, performance collapse, and trust region issues in PPO, and present Proximal Feature Optimization (PFO), a novel auxiliary loss, that along with other interventions shows that regularizing the representation dynamics improves the performance of PPO agents.
+However,
+previous works have observed that networks trained under non-stationarity exhibit an inability to continue learning,
+termed loss of plasticity, and eventually a collapse in performance.
+For off-policy deep value-based RL methods,
+this phenomenon has been correlated with a decrease in representation rank and the ability to fit random targets,
+termed capacity loss.
+Although this correlation has generally been attributed to neural network learning under non-stationarity,
+the connection to representation dynamics has not been carefully studied in on-policy policy optimization methods.
+In this work,
+we empirically study representation dynamics in Proximal Policy Optimization (PPO) on the Atari and MuJoCo environments,
+revealing that PPO agents are also affected by feature rank deterioration and capacity loss.
+We show that this is aggravated by stronger non-stationarity,
+ultimately driving the actor's performance to collapse, regardless of the performance of the critic.
+We ask why the trust region, specific to methods like PPO,
+cannot alleviate or prevent the collapse
+and find a connection between representation collapse and the degradation of the trust region,
+one exacerbating the other.
+Finally, we present Proximal Feature Optimization (PFO), a novel auxiliary loss that, along with other interventions,
+shows that regularizing the representation dynamics mitigates the performance collapse of PPO agents.
 
 ![](outputs/github-figures/figure-1.png "Figure 1")
 ![](outputs/github-figures/figure-3.png "Figure 3")
@@ -63,15 +79,21 @@ We provide scripts to fully reproduce our work in the `reproducibility-scripts/`
 It has a README at its root describing which scripts reproduce which experiments.
 This also includes the plotting notebook.
 
-Raw logs and model checkpoints are too heavy to share at the moment,
-however, we provide `.csv` files combining all the raw logs to reproduce the plots or perform further analysis
-without re-running the experiments.
+We provide the raw logs and model checkpoints of all our runs
+([download link](https://datasets.epfl.ch/claire/no-representation-no-trust-release/release-compressed.tar.gz)) and `.csv` files
+([download link](https://datasets.epfl.ch/claire/no-representation-no-trust-release/combined-raw-logs-compressed.tar.gz))
+combining all the raw logs to reproduce our plots.
+These logs can be used to perform further analysis without re-running the experiments.
 Refer to `outputs/README.md` for more information.
 
-Furthermore, all of our runs can be found in [this W&B project](https://wandb.ai/lawmen-05-shark/no-representation-no-trust/).
+Furthermore, all of our runs can be found in one of these three W&B project projects:
+1. [Release](https://wandb.ai/claire-labo/no-representation-no-trust-release?nw=wt64llanggc) (all runs with our implementation except for figures 32-35)
+2. [Release CleanRL](https://wandb.ai/claire-labo/no-representation-no-trust-release-cleanrl?nw=fk063z9y4v9) (CleanRL runs for replication)
+3. [Release Atari Extra](https://wandb.ai/claire-labo/no-representation-no-trust-release-extra?nw=fpi50tbxbc) (runs for figures 32-35)
 
-We provide a summary W&B report [here](https://api.wandb.ai/links/lawmen-05-shark/70cat8oq)
-and a W&B report of a short replication with CleanRL [here](https://api.wandb.ai/links/lawmen-05-shark/m3yly6mw).
+We provide short W&B reports demonstrating the replicability of runs with CleanRL on
+[Atari](https://wandb.ai/claire-labo/no-representation-no-trust-release-cleanrl/reports/Replication-of-Atari-with-CleanRL--Vmlldzo5OTQwMzMy) and [MuJoCo](https://wandb.ai/claire-labo/no-representation-no-trust-release-cleanrl/reports/Replication-of-MuJoCo-with-CleanRL--Vmlldzo5OTQwMDEx).
+We also provide a short W&B report to demonstrate the collapse phenomenon on MuJoCo with minimal modifications to the CleanRL code [here](https://wandb.ai/claire-labo/no-representation-no-trust-release-cleanrl/reports/CleanRL-Original-Setting-MuJoCo-Collapse--Vmlldzo5OTQwMTM0).
 
 ![](outputs/github-figures/replication.png "Replication with CleanRL")
 
@@ -87,24 +109,29 @@ You can get examples of how to do so in the `reproducibility-scripts/` directory
 Below, we give a description of the main files and directories in this repository.
 
 ```
-└── src/                                # Source code.
-    └── po_dynamics                     # Our package.
-        ├── configs/                    # configuration files for environments, models, and algorithms.
-        ├── modules/                    # Environment builders, models, losses, and logged metrics.
-        ├── solve.py                    # Main script to train models.
-        ├── capacity.py                 # Script to compute plasticity.
-        └── toy_problem.py              # Script to run the toy setting of Figure 5.
+└── src/                                        # Source code.
+    └── po_dynamics                             # Our package.
+        ├── configs/                            # configuration files for environments, models, and algorithms.
+        ├── modules/                            # Environment builders, models, losses, and logged metrics.
+        ├── solve.py                            # Main script to train models.
+        ├── capacity.py                         # Script to compute capacity loss.
+        └── toy_problem.py                      # Script to run the toy setting of Figure 5.
 
-    └─── cleanrl/                       # Scripts to mimic our implementation in CleanRL (has very limited features).
-                                          # Used to reproduce and verify that our implementation doesn't have a random bug.
-          ├── ppo_atari_original.py     # CleanRL's PPO implementation.
-          ├── ppo_atari.py              # Modified CleanRL's PPO to have the same setting as out codebase.
-          ├── ppo_atari_2models.py      # Same but with separate actor and critic.
-          └── template_experiment.py
+    └─── cleanrl/                               # Scripts to mimic our implementation in CleanRL (with very limited features).
+                                                # Used to reproduce and verify that our implementation doesn't have a random bug.
+        ├── ppo_atari_original.py               # CleanRL's PPO implementation on Atari.
+        ├── ppo_mujoco_original.py              # CleanRL's PPO implementation on MuJoCo.
+        ├── ppo_atari_1model.py                 # Modified CleanRL's PPO to have the same setting as out codebase.
+        ├── ppo_atari_2models.py                # Same but with separate actor and critic.
+        ├── ppo_mujoco_torch.py                 # Modified CleanRL's PPO to have the same setting as out codebase.
+        └── ppo_mujoco_original_collapse.py     # Minimal changes to CleanRL's PPO implementation on MuJoCo with collapse.
 
 ```
 
 ## Contributing
+
+This repository is a frozen copy of the codebase to reproduce the results of the paper.
+You can fork the repository and use the following code-quality tools to contribute to the codebase.
 
 We use [`pre-commit`](https://pre-commit.com) hooks to ensure high-quality code.
 Make sure it's installed on the system where you're developing

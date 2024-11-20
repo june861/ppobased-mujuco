@@ -31,6 +31,8 @@ debug:
   check_env_specs: False  # Checks the environment specs before and after transforms.
   benchmark_env: False    # Benchmarks the fps of the environment before and after transforms.
 
+sparsify_rewards: False
+
 logging:
   log_level:
     # Frequency at which to log the training progress.

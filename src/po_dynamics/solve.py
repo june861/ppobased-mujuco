@@ -301,6 +301,12 @@ def main(config: DictConfig) -> None:
 
             timers["state_value"] = time.time() - timers["state_value"]
             timers["targets_batch"] = time.time()
+
+            if config.sparsify_rewards:
+                batches[("next", "reward")] *= (
+                    torch.bernoulli(torch.full(batches.shape, 0.1)).unsqueeze(-1).to(config.device.training)
+                )  # 0.1 probability of keeping
+
             target_estimator_critic(batches)
             target_estimator_actor(batches)
             timers["targets_batch"] = time.time() - timers["targets_batch"]

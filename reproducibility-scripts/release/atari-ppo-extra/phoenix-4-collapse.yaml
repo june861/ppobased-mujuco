@@ -1,5 +1,5 @@
 project: no-representation-no-trust
-name: atari-ppo-baselines
+name: phoenix-4-collapse
 method: grid
 metric:
   goal: maximize
@@ -8,21 +8,23 @@ parameters:
   wandb.mode:
     value: online
   wandb.tags:
-    value: [rlc, experiment, baseline]
+    value: [ extra-experiment ]
   outputs_subdir:
-    value: rlconf
+    value: release
   job_subdir:
-    value: "atari-ppo/baselines"
+    value: "atari-ppo-extra/phoenix-4-collapse"
   env:
     value: gym-atari
   env.name:
-    values: [ "ALE/Phoenix-v5", "ALE/NameThisGame-v5", "ALE/DoubleDunk-v5", "ALE/Qbert-v5", "ALE/Gravitar-v5", "ALE/BattleZone-v5" ]
+    value: "ALE/Phoenix-v5"
   seed:
-    values: [ 25, 7, 64, 27, 4 ]
+    values: [ 25, 7, 64 ]
   optim.num_epochs:
-    values: [ 4, 6, 8 ]
+    value: 4
   optim.anneal_linearly:
-    values: [ False, True ]
+    values: [ False ]
+  collector.total_env_steps:
+    value: 200_000_000
 command:
   - python
   - "-m"

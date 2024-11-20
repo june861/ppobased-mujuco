@@ -22,7 +22,7 @@ parameters:
   optim.num_epochs:
     values: [ 10, 15, 20 ]
   optim.anneal_linearly:
-    values: [ False, True ]
+    values: [ False ]
   models.activation:
     values: [ Tanh, ReLU ]
   collector.total_env_steps:

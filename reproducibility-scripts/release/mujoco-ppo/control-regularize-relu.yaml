@@ -16,7 +16,7 @@ parameters:
   env:
     value: gym-mujoco
   env.name:
-    values: [ "Humanoid-v4", "Hopper-v4"]
+    values: [ "Ant-v4", "HalfCheetah-v4", "Humanoid-v4", "Hopper-v4" ]
   seed:
     values: [ 25, 7, 64, 27, 4 ]
   optim.num_epochs:

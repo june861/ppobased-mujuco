@@ -10,19 +10,20 @@ USRID=$(id -u)
 GRP=$(id -gn)
 # USR is used in the image name and must be lowercase.
 # It's fine if your username is not lowercase, jut make it lowercase.
-USR=$(id -un | tr "[:upper:]" "[:lower:]")
+# junweiluo add: tr -d "." pipline
+USR=$(id -un | tr "[:upper:]" "[:lower:]" | tr -d ".")
 # PASSWD is not secret,
 # it is only there to avoid running password-less sudo commands accidentally.
-PASSWD=$(id -un)
+PASSWD=$(id -un | tr -d ".")
 # LAB_NAME will be the first component in the image path.
 # It must be lowercase.
-LAB_NAME=$(id -un | tr "[:upper:]" "[:lower:]")
+LAB_NAME=$(id -un | tr "[:upper:]" "[:lower:]" | tr -d ".")
 
 ## For running locally
 # You can find the acceleration options in the compose.yaml file
-# by looking at the services with names dev-local-ACCELERATION.
+# by looking at the services with names dev-local-ACCELERATION. 
 PROJECT_ROOT_AT=/project/no-representation-no-trust
-ACCELERATION=cpu
+ACCELERATION=cuda
 WANDB_API_KEY=
 
 ####################
@@ -199,7 +200,11 @@ up() {
   # Creates a detached container from the development image.
   # ./template.sh up
   check
+  # junweiluo
+  echo "COMPOSE_PROJECT is ${COMPOSE_PROJECT}, compose.yaml is dev-local-${ACCELERATION}"
+  echo "docker will run docker compose -p ${COMPOSE_PROJECT} up -d dev-local-${ACCELERATION}"
   docker compose -p "${COMPOSE_PROJECT}" up -d "dev-local-${ACCELERATION}"
+  
 }
 
 down() {

@@ -134,7 +134,7 @@ class Agent(nn.Module):
         self.critic = layer_init(nn.Linear(64, 1), std=1.0)
         self.actor_trunk = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
-            self.activation_fn,
+            self.activation_fn, 
             layer_init(nn.Linear(64, 64)),
             self.activation_fn,
         )
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(f"outputs/cleanrl_runs/{run_name}")
     writer.add_text(
         "hyperparameters",
-        "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
+        "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key} |{value}|" for key, value in vars(args).items()])),
     )
 
     # TRY NOT TO MODIFY: seeding

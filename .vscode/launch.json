@@ -5,11 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "Python Debugger: ppo_mujoco_original",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "program": "/project/no-representation-no-trust/src/cleanrl/ppo_mujoco_original.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--exp_name", "debugger_test",
+                "--seed", "0",
+                "--env_id", "Ant-v4",
+                // "--sample_action_num", "3"
+            ]
         },
 
         {

@@ -3,6 +3,8 @@
 import os
 import random
 import time
+import sys
+import wandb
 from dataclasses import dataclass
 
 import gymnasium as gym
@@ -11,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
+from config import get_config
 from torch.distributions.normal import Normal
 from loguru import logger
 from torch.utils.tensorboard import SummaryWriter
@@ -88,9 +91,6 @@ class Args:
     """ action sample parameters """
     sample_action_num: int = 2
 
-
-
-
 def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
         if capture_video and idx == 0:
@@ -109,12 +109,10 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
 
     return thunk
 
-
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
     torch.nn.init.constant_(layer.bias, bias_const)
     return layer
-
 
 class Agent(nn.Module):
     # DONE(junweiluo)：增加一个离散化动作的参数
@@ -182,31 +180,36 @@ class Agent(nn.Module):
 
 
 if __name__ == "__main__":
-    args = tyro.cli(Args)
+    # args = tyro.cli(Args)
+    parser = get_config()
+    args = parser.parse_args(sys.argv[1:])
+
+    # batch size 设计
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
 
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
     if args.track:
-        import wandb
-
+        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}"
         wandb.init(
             project=args.wandb_project_name,
-            entity=args.wandb_entity,
+            group=wandb_group,
+            # entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
             monitor_gym=True,
             save_code=True,
         )
+
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
 
-    logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
+    
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -221,8 +224,11 @@ if __name__ == "__main__":
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
     if args.sample_action_num == None:
-        args.sample_action_num = envs.single_action_space[0]
+        args.sample_action_num = envs.single_action_space.shape[0]
     
+    logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
+
+
     agent = Agent(envs, sample_action_num = args.sample_action_num).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
@@ -273,6 +279,11 @@ if __name__ == "__main__":
                         logger.info(f"global_step = {global_step}, episodic_return = {info['episode']['r']}")
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+                        if args.track:
+                            wandb.log({
+                                "episodic_return": info["episode"]["r"],
+                                "episodic_length": info["episode"]["l"],
+                            })
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -310,13 +321,15 @@ if __name__ == "__main__":
                 mb_inds = b_inds[start:end]
 
                 _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
-                logratio = torch.prod(newlogprob - b_logprobs[mb_inds], dim=1, keepdim=True)
+
+                total_logratio = newlogprob - b_logprobs[mb_inds]
+                logratio = total_logratio[:,0]
                 # ratio = logratio.exp()
 
                 # junweiluo：增加指标记录
-                ratio1 = logratio[:,0].exp()
+                ratio1 = logratio.exp()
                 if args.sample_action_num > 1:
-                    ratio2 = torch.prod(logratio[:,1:], dim=1).exp().detach()
+                    ratio2 = torch.prod(total_logratio[:,1:], dim=1).exp().detach()
                 else:
                     ratio2 = torch.ones_like(ratio1).detach()
                 ratio = ratio1 * ratio2
@@ -365,6 +378,24 @@ if __name__ == "__main__":
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+
+        # if args.track:
+        #     logs_ = {
+        #         "time_step": global_step,
+        #         "learning_rate": optimizer.param_groups[0]["lr"],
+        #         "value_loss" : v_loss.item(),
+        #         "policy_loss" : pg_loss.item(),
+        #         "entropy": entropy_loss.item(),
+        #         "old_approx_kl": old_approx_kl.item(),
+        #         "approx_kl": approx_kl.item(),
+        #         "clipfrac" :  np.mean(clipfracs),
+        #         "explained_variance" : explained_var,
+        #         "ratio" : np.mean(ratio.detach().cpu().numpy()),
+        #         "ratio1": np.mean(ratio1.detach().cpu().numpy()),
+        #         "ratio2": np.mean(ratio2.detach().cpu().numpy()),
+        #     }
+        #     logger.info(f"log data is {logs_}")
+        #     wandb.log(logs_)
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)

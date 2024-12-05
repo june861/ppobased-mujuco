@@ -1,7 +1,7 @@
 import argparse
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Arguments for the experiment")
+def get_config():
+    parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")
     
     # Experiment arguments
     parser.add_argument('--exp_name', type=str, default=None, required=True,
@@ -10,8 +10,8 @@ def parse_args():
     parser.add_argument('--torch_deterministic', type=bool, default=True, 
                         help="If toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument('--cuda', type=bool, default=True, help="If toggled, cuda will be enabled by default")
-    parser.add_argument('--track', type=bool, default=False, help="If toggled, this experiment will be tracked with Weights and Biases")
-    parser.add_argument('--wandb_project_name', type=str, default="cleanRL", help="The wandb's project name")
+    parser.add_argument('--track', type=bool, default=True, help="If toggled, this experiment will be tracked with Weights and Biases")
+    parser.add_argument('--wandb_project_name', type=str, default="cleanRL-mujuco", help="The wandb's project name")
     parser.add_argument('--wandb_entity', type=str, default=None, help="The entity (team) of wandb's project")
     parser.add_argument('--capture_video', type=bool, default=False, 
                         help="Whether to capture videos of the agent performances (check out `videos` folder)")
@@ -45,6 +45,7 @@ def parse_args():
 
     # Action sample parameters
     parser.add_argument('--sample_action_num', type=int, default=None, help="Number of actions to sample")
+    parser.add_argument('--wandb_group', type=str, default=None, help="the wandb group name")
 
-    args = parser.parse_args()
-    return args
+    
+    return parser

@@ -155,3 +155,4 @@ wandb
 /cleanrl/
 runs/
 draft.sh
+.vscode/

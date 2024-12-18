@@ -13,23 +13,19 @@
             "args": [
                 "--exp_name", "debugger_test",
                 "--seed", "0",
-                "--env_id", "Ant-v4",
+                "--env_id", "Reacher-v4",
+                "--track",
                 // "--sample_action_num", "3"
             ]
         },
 
         {
-        "name": "Run TensorBoard",
-        "type": "node",
-        "request": "launch",
-        "program": "/usr/local/bin/tensorboard",  // 替换为 tensorboard 的实际路径
-        "args": [
-            "--logdir=/project/no-representation-no-trust/runs",  // 日志文件夹
-            "--port=6007"       // 设置端口
-        ],
-        "env": {
-            "PYTHONPATH": "/usr/bin/python3"  // 可选，指定 Python 环境路径
-        }
-        }
+            "name": "Python Debugger: get obs",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/project/no-representation-no-trust/src/scripts/for_obs.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
     ]
 }

@@ -1,27 +1,45 @@
 import wandb
 import numpy as np
+import matplotlib.pyplot as plt
 
-# 初始化 API 客户端
+# 初始化API接口
 api = wandb.Api()
-# 设置你要查询的项目和 group
-project_name = "cleanRL-mujuco"
-group_name = "Humanoid-v4__baseline"
+
+# 指定你的实体（用户或团队名称）和项目名称
 entity = "overtheriver861-bupt"
+project = "cleanRL-mujuco"
 
-# 获取所有属于同一 group 的 runs
-runs = api.runs(path=f"{entity}/{project_name}")
-env_id = {
-    ""
-}
-# 假设我们感兴趣的是 'loss' 曲线
-returns = []
+# 获取项目中的所有run
+runs = api.runs(f"{entity}/{project}")
 
-# 遍历每个 run，获取 loss 曲线
+groups = {}
 for run in runs:
-    # 假设每个 run 都有一个 'loss' 记录
-    returns.append(run.summary.get('charts/episodic_return'))
+    if run.group is not None:  # 只考虑有分组的run
+        if run.group not in groups:
+            groups[run.group] = []
+        groups[run.group].append(run)
 
-# 计算所有 loss 的平均值
-average_loss = np.mean(returns)
+# 存储每个group的平均值
+group_averages = {}
 
-print(f"Average loss for group {group_name}: {average_loss}")
+for group_name, group_runs in groups.items():
+    metric_data = []  # 存储该组中所有run的metric数据
+    for run in group_runs:
+        history = run.scan_history()  # 获取run的历史记录
+        metric_values = [record['episodic_return'] for record in history if 'episodic_return' in record]
+        metric_data.append(metric_values)
+    
+    # 确保所有的run有相同数量的时间步长
+    min_length = min(len(values) for values in metric_data)
+    trimmed_metric_data = [values[:min_length] for values in metric_data]
+
+    # 计算平均值
+    average_curve = np.mean(trimmed_metric_data, axis=0)
+    group_averages[group_name] = average_curve
+
+# 绘制结果
+for group_name, avg_curve in group_averages.items():
+    plt.plot(avg_curve, label=f"Group {group_name}")
+
+plt.legend()
+plt.show()

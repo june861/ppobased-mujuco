@@ -10,8 +10,8 @@ def get_config():
     parser.add_argument('--torch_deterministic', type=bool, default=True, 
                         help="If toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument('--cuda', type=bool, default=True, help="If toggled, cuda will be enabled by default")
-    parser.add_argument('--track', type=bool, default=True, help="If toggled, this experiment will be tracked with Weights and Biases")
-    parser.add_argument('--wandb_project_name', type=str, default="cleanRL-mujuco", help="The wandb's project name")
+    parser.add_argument('--track', action="store_false", default=True, help="If toggled, this experiment will be tracked with Weights and Biases")
+    parser.add_argument('--wandb_project_name', type=str, default="cleanRL-mujuco-v2", help="The wandb's project name")
     parser.add_argument('--wandb_entity', type=str, default=None, help="The entity (team) of wandb's project")
     parser.add_argument('--capture_video', type=bool, default=False, 
                         help="Whether to capture videos of the agent performances (check out `videos` folder)")

@@ -156,3 +156,4 @@ wandb
 runs/
 draft.sh
 .vscode/
+logs/

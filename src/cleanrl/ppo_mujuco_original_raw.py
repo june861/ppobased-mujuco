@@ -3,8 +3,6 @@
 import os
 import random
 import time
-import sys
-import wandb
 from dataclasses import dataclass
 
 import gymnasium as gym
@@ -13,9 +11,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
-from config import get_config
 from torch.distributions.normal import Normal
-from loguru import logger
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -45,13 +41,13 @@ class Args:
     """the user or org name of the model repository from the Hugging Face Hub"""
 
     # Algorithm specific arguments
-    env_id: str = "HalfCheetah-v4"
+    env_id: str = "Humanoid-v4"
     """the id of the environment"""
     total_timesteps: int = 1000000
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
-    num_envs: int = 8
+    num_envs: int = 2
     """the number of parallel game environments"""
     num_steps: int = 2048
     """the number of steps to run in each environment per policy rollout"""
@@ -63,7 +59,6 @@ class Args:
     """the lambda for the general advantage estimation"""
     num_minibatches: int = 32
     """the number of mini-batches"""
-    # 准备测试一下更小的epochs
     update_epochs: int = 10
     """the K epochs to update the policy"""
     norm_adv: bool = True
@@ -89,8 +84,6 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
-    """ action sample parameters """
-    sample_action_num: int = 2
 
 def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
@@ -110,14 +103,15 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
 
     return thunk
 
+
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
     torch.nn.init.constant_(layer.bias, bias_const)
     return layer
 
+
 class Agent(nn.Module):
-    # DONE(junweiluo)：增加一个离散化动作的参数
-    def __init__(self, envs, sample_action_num = 1, max_scale = 1.0):
+    def __init__(self, envs):
         super().__init__()
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
@@ -135,30 +129,6 @@ class Agent(nn.Module):
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space.shape)))
 
-        # junweiluo: 增加参数，
-        self.sample_action_num = sample_action_num 
-        self.scale = max_scale
-    
-    # junweiluo: 增加函数
-    def sample_action(self, probs):
-
-        actions = []
-        for _ in range(self.sample_action_num):
-            i_action = torch.tanh(probs.sample()) * self.scale
-            actions.append(i_action)
-        actions = torch.stack(actions, dim = 1)
-        log_probs = self.get_logprobs(actions, probs)
-
-        return actions, log_probs
-
-    def get_logprobs(self, actions, probs):
-        """ actions shape is [num_envs, self.sample_action_num, action_dim] """
-        log_probs = []
-        for i in range(self.sample_action_num):
-            log_probs.append(probs.log_prob(actions[:,i,:]))
-        
-        return torch.stack(log_probs, dim = 1).sum(2)
-
     def get_value(self, x):
         return self.critic(x)
 
@@ -168,50 +138,34 @@ class Agent(nn.Module):
         action_std = torch.exp(action_logstd)
         probs = Normal(action_mean, action_std)
         if action is None:
-            # action shape is (num_envs, sample_action_num, action_dim)
-            action, log_probs = self.sample_action(probs)
-            return action, log_probs, probs.entropy().sum(1), self.critic(x)
-            # else:
-            #     action = probs.sample()
-            #     return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
-        
-        # ppo更新时计算新的log_probs
-        log_probs = self.get_logprobs(actions = action, probs = probs)
-        
-        return action, log_probs, probs.entropy().sum(1), self.critic(x)
+            action = probs.sample()
+        return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
 if __name__ == "__main__":
-    # args = tyro.cli(Args)
-    parser = get_config()
-    args = parser.parse_args(sys.argv[1:])
-
-    # batch size 设计
+    args = tyro.cli(Args)
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
-
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
     if args.track:
-        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}"
+        import wandb
+
         wandb.init(
             project=args.wandb_project_name,
-            group=wandb_group,
-            # entity=args.wandb_entity,
+            entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
             monitor_gym=True,
             save_code=True,
         )
-
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
 
-    
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -225,25 +179,17 @@ if __name__ == "__main__":
         [make_env(args.env_id, i, args.capture_video, run_name, args.gamma) for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
-    if args.sample_action_num == None:
-        args.sample_action_num = envs.single_action_space.shape[0]
-    
-    logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
 
-
-    agent = Agent(envs, sample_action_num = args.sample_action_num, max_scale = envs.single_action_space.high[0]).to(device)
+    agent = Agent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
-    # junweiluo: 修改一下replay buffer的形状
     obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
-    actions = torch.zeros((args.num_steps, args.num_envs) + (args.sample_action_num, ) + envs.single_action_space.shape).to(device)
-    logprobs = torch.zeros((args.num_steps, args.num_envs)+ (args.sample_action_num, )).to(device)
+    actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
+    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    
-    # 增加一个episodic_returns的记录器用于对齐数据
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
@@ -259,9 +205,6 @@ if __name__ == "__main__":
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
-        # record return
-        total_return = 0.0
-        
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -275,33 +218,18 @@ if __name__ == "__main__":
             logprobs[step] = logprob
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            next_obs, reward, terminations, truncations, infos = envs.step(action[:,0,:].cpu().numpy())
+            next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
             if "final_info" in infos:
-                for index, info in enumerate(infos["final_info"]):
+                for info in infos["final_info"]:
                     if info and "episode" in info:
-                        # logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
-                        writer.add_scalar("charts/episodic_return", info["episode"]["r"] , global_step)
+                        print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
+                        writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
-                        writer.add_scalar("charts/global_step", global_step)
-                        total_return += info["episode"]["r"]
-                        # if args.track:
-                        #     wandb.log({
-                        #         "episodic_return": info["episode"]["r"],
-                        #         "episodic_length": info["episode"]["l"],
-                        #         # "global_step": global_step,
-                        #     })
 
-        # record reward
-        traj_total_rewards = torch.sum(rewards).numpy()
-        traj_mean_rewards = traj_total_rewards / args.num_envs
-        logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
-        writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
-        writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
-        
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -320,10 +248,8 @@ if __name__ == "__main__":
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
-        # b_logprobs shape is (args.num_steps * args.num_envs, args.sample_action_num)
-        b_logprobs = logprobs.reshape((-1,) + (args.sample_action_num,))
-        # b_actions shape is (args.num_steps * args.num_envs, args.sample_action_num, action_dim)
-        b_actions = actions.reshape((-1,) + (args.sample_action_num,) + envs.single_action_space.shape)
+        b_logprobs = logprobs.reshape(-1)
+        b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
@@ -338,18 +264,8 @@ if __name__ == "__main__":
                 mb_inds = b_inds[start:end]
 
                 _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
-
-                total_logratio = newlogprob - b_logprobs[mb_inds]
-                logratio = total_logratio[:,0]
-                # ratio = logratio.exp()
-
-                # junweiluo：增加指标记录
-                ratio1 = logratio.exp()
-                if args.sample_action_num > 1:
-                    ratio2 = torch.prod(total_logratio[:,1:].exp(), dim=1).detach()
-                else:
-                    ratio2 = torch.ones_like(ratio1).detach()
-                ratio = ratio1 * ratio2
+                logratio = newlogprob - b_logprobs[mb_inds]
+                ratio = logratio.exp()
 
                 with torch.no_grad():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
@@ -396,24 +312,6 @@ if __name__ == "__main__":
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
-        # if args.track:
-        #     logs_ = {
-        #         "time_step": global_step,
-        #         "learning_rate": optimizer.param_groups[0]["lr"],
-        #         "value_loss" : v_loss.item(),
-        #         "policy_loss" : pg_loss.item(),
-        #         "entropy": entropy_loss.item(),
-        #         "old_approx_kl": old_approx_kl.item(),
-        #         "approx_kl": approx_kl.item(),
-        #         "clipfrac" :  np.mean(clipfracs),
-        #         "explained_variance" : explained_var,
-        #         "ratio" : np.mean(ratio.detach().cpu().numpy()),
-        #         "ratio1": np.mean(ratio1.detach().cpu().numpy()),
-        #         "ratio2": np.mean(ratio2.detach().cpu().numpy()),
-        #     }
-        #     logger.info(f"log data is {logs_}")
-        #     wandb.log(logs_)
-
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
@@ -423,19 +321,13 @@ if __name__ == "__main__":
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
-
-        # junweiluo： 增加指标
-        writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()), global_step)
-        writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()), global_step)
-        writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()), global_step)
-
-        logger.info(f"SPS: {int(global_step / (time.time() - start_time))}")
+        print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         torch.save(agent.state_dict(), model_path)
-        logger.info(f"model saved to {model_path}")
+        print(f"model saved to {model_path}")
         from cleanrl_utils.evals.ppo_eval import evaluate
 
         episodic_returns = evaluate(
@@ -453,6 +345,7 @@ if __name__ == "__main__":
 
         if args.upload_model:
             from cleanrl_utils.huggingface import push_to_hub
+
             repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
             repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
             push_to_hub(args, episodic_returns, repo_id, "PPO", f"runs/{run_name}", f"videos/{run_name}-eval")

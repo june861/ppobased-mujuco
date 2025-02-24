@@ -1,17 +1,19 @@
 echo "Mujuco Run Scripts"
-seeds=(1 2 3 4 5)
+# seeds=(1 2 3)
+seeds=(1 2 3)
 envs=(
-    # "HalfCheetah-v4"
-    # "HumanoidStandup-v4"
-    # "Humanoid-v4"
-    # "Walker2d"
-    # "Swimmer"
-    # "Ant-v4"
-    # "InvertedDoublePendulum-v4"
-    # "Hopper-v4"
+    "Hopper-v4"
     "Reacher-v4"
+    "Walker2d"
+    "InvertedDoublePendulum-v4"
+    "InvertedPendulum-v4"
+    "Humanoid-v4"
+    # "HalfCheetah-v4"
+    "Ant-v4"
+    "HumanoidStandup-v4"
 )
-sample_action_num=(1 2 4 8 16 32)
+env_exp="AnchorPPO-Mujuco-v2"
+sample_action_num=(1 2)
 
 for env_id in "${envs[@]}"
 do
@@ -32,11 +34,11 @@ do
         do
             two_act="logs/${env_id}_${action_num}_act_${seed}.log"
             exp_name="sample${action_num}_act"
-            nohup /usr/bin/python ./src/cleanrl/ppo_mujoco_original.py --seed $seed --exp_name $exp_name \
-                --env_id $env_id --sample_action_num $action_num >> $two_act 2>&1 &
+            /usr/bin/python ./src/cleanrl/ppo_mujoco_original.py --seed $seed --exp_name $exp_name \
+                --env_id $env_id --sample_action_num $action_num --wandb_project_name $env_exp --total_timesteps 5000000
             
             echo "Experiment with seed=$seed sample_act_num=$action_num exp_name=$exp_name"
-            echo
+            echo "Log File is ${two_act}"
         done
         echo "Experiment with seed=$seed finished."
     done

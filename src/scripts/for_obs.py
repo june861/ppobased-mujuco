@@ -10,13 +10,42 @@
 import numpy as np
 import gymnasium as gym
 
-env_id = "Humanoid-v4"
-env = gym.make(env_id)
-env.reset()
-terminal = False
-while not terminal:
-    action = np.tanh(np.random.randn(17,)) * 0.4
-    obs_, reward, terminal, trunc, env_info =  env.step(action)
+
+
+class DiscreteActionWrapper(gym.ActionWrapper):
+    def __init__(self, env, n_actions):
+        super().__init__(env)
+        self.n_actions = n_actions
+        self.action_bins = np.linspace(env.action_space.low[0], env.action_space.high[0], n_actions)
+        self.action_space = gym.spaces.Discrete(self.n_actions * env.action_space.shape[0])
+    
+    def action(self, action):
+        # 根据离散动作索引解码出每个维度的动作
+        action_indices = np.unravel_index(action, [self.n_actions] * len(self.action_space_shape))
+        continuous_action = np.array([self.action_bins[i][action_indices[i]] for i in range(len(self.action_space_shape))])
+        return continuous_action
+
+env_ids = [
+    "HalfCheetah-v4",
+    "HumanoidStandup-v4",
+    "Humanoid-v4",
+    "Walker2d-v4",
+    "Ant-v4",
+    "InvertedDoublePendulum-v4",
+    "Hopper-v4",
+    "Reacher-v4",
+    "InvertedPendulum-v4",
+    ]
+
+for env_id in env_ids:
+    env = gym.make(env_id)
+    print(env_id, env.action_space, env.action_space.low, env.action_space.high, sep="\t")
+
+# terminal = False
+# while not terminal:
+#     action = np.tanh(np.random.randn(17,)) * 0.4
+#     action =np.tanh(np.random.randn(1,)) * 0.4
+#     obs_, reward, terminal, trunc, env_info =  env.step(action)
 
 
 # Humanoid-v4 Reward Function

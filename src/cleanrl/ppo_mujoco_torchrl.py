@@ -56,7 +56,7 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "Hopper-v4"
+    env_id: str = "Humanoid-v4"
     """the id of the environment"""
     time_aware: bool = True
     """Time aware observation"""

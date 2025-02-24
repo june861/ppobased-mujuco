@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 import tyro
 from config import get_config
+from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 from loguru import logger
 from torch.utils.tensorboard import SummaryWriter
@@ -64,7 +65,7 @@ class Args:
     num_minibatches: int = 32
     """the number of mini-batches"""
     # 准备测试一下更小的epochs
-    update_epochs: int = 10
+    update_epochs: int = 5
     """the K epochs to update the policy"""
     norm_adv: bool = True
     """Toggles advantages normalization"""
@@ -92,10 +93,27 @@ class Args:
     """ action sample parameters """
     sample_action_num: int = 2
 
+class DiscreteActionWrapper(gym.ActionWrapper):
+    def __init__(self, env, n_actions):
+        super().__init__(env)
+        self.n_actions = n_actions
+        self.action_bins = np.linspace(env.action_space.low[0], env.action_space.high[0], n_actions)
+        self.action_space = gym.spaces.Discrete(n_actions)
+    
+    def action(self, action):
+        # 根据离散动作索引解码出每个维度的动作
+        action_indices = np.unravel_index(action, [self.n_actions_per_dim] * len(self.action_space_shape))
+        continuous_action = np.array([self.action_bins[i][action_indices[i]] for i in range(len(self.action_space_shape))])
+        return continuous_action
+
+
+
 def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
         if capture_video and idx == 0:
             env = gym.make(env_id, render_mode="rgb_array")
+            # 离散化环境动作空间
+            env = DiscreteActionWrapper(env, n_actions = 10)
             env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         else:
             env = gym.make(env_id)
@@ -115,9 +133,12 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.constant_(layer.bias, bias_const)
     return layer
 
+
+
+
 class Agent(nn.Module):
     # DONE(junweiluo)：增加一个离散化动作的参数
-    def __init__(self, envs, sample_action_num = 1, max_scale = 1.0):
+    def __init__(self, envs, n_actions, sample_action_num = 1):
         super().__init__()
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
@@ -126,31 +147,33 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0),
         )
+        # 不再是输出均值了
         self.actor_mean = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, np.prod(envs.single_action_space.shape)), std=0.01),
+            # layer_init(nn.Linear(64, np.prod(envs.single_action_space.shape)), std=0.01),
+            layer_init(nn.Linear(64, n_actions), std=0.01),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space.shape)))
 
         # junweiluo: 增加参数，
+        self.n_actions = n_actions
         self.sample_action_num = sample_action_num 
-        self.scale = max_scale
     
     # junweiluo: 增加函数
     def sample_action(self, probs):
-
         actions = []
         for _ in range(self.sample_action_num):
-            i_action = torch.tanh(probs.sample()) * self.scale
+            i_action = probs.sample()
             actions.append(i_action)
         actions = torch.stack(actions, dim = 1)
         log_probs = self.get_logprobs(actions, probs)
 
         return actions, log_probs
-
+    
+    
     def get_logprobs(self, actions, probs):
         """ actions shape is [num_envs, self.sample_action_num, action_dim] """
         log_probs = []
@@ -163,6 +186,12 @@ class Agent(nn.Module):
         return self.critic(x)
 
     def get_action_and_value(self, x, action=None):
+        logits = self.actor_mean(x) # shape is (env_num, n_actions)
+        probs = torch.softmax(logits, dim=-1)
+        value = self.get_value(x)
+        
+        return probs, value
+        
         action_mean = self.actor_mean(x)
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
@@ -231,7 +260,7 @@ if __name__ == "__main__":
     logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
 
 
-    agent = Agent(envs, sample_action_num = args.sample_action_num, max_scale = envs.single_action_space.high[0]).to(device)
+    agent = Agent(envs, sample_action_num = args.sample_action_num).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
@@ -242,8 +271,6 @@ if __name__ == "__main__":
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    
-    # 增加一个episodic_returns的记录器用于对齐数据
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
@@ -259,9 +286,6 @@ if __name__ == "__main__":
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
-        # record return
-        total_return = 0.0
-        
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -281,27 +305,17 @@ if __name__ == "__main__":
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
             if "final_info" in infos:
-                for index, info in enumerate(infos["final_info"]):
+                for info in infos["final_info"]:
                     if info and "episode" in info:
-                        # logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
-                        writer.add_scalar("charts/episodic_return", info["episode"]["r"] , global_step)
+                        logger.info(f"global_step = {global_step}, episodic_return = {info['episode']['r']}")
+                        writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
-                        writer.add_scalar("charts/global_step", global_step)
-                        total_return += info["episode"]["r"]
-                        # if args.track:
-                        #     wandb.log({
-                        #         "episodic_return": info["episode"]["r"],
-                        #         "episodic_length": info["episode"]["l"],
-                        #         # "global_step": global_step,
-                        #     })
+                        if args.track:
+                            wandb.log({
+                                "episodic_return": info["episode"]["r"],
+                                "episodic_length": info["episode"]["l"],
+                            })
 
-        # record reward
-        traj_total_rewards = torch.sum(rewards).numpy()
-        traj_mean_rewards = traj_total_rewards / args.num_envs
-        logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
-        writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
-        writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
-        
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -346,7 +360,7 @@ if __name__ == "__main__":
                 # junweiluo：增加指标记录
                 ratio1 = logratio.exp()
                 if args.sample_action_num > 1:
-                    ratio2 = torch.prod(total_logratio[:,1:].exp(), dim=1).detach()
+                    ratio2 = torch.prod(total_logratio[:,1:], dim=1).exp().detach()
                 else:
                     ratio2 = torch.ones_like(ratio1).detach()
                 ratio = ratio1 * ratio2

@@ -11,7 +11,7 @@ def get_config():
                         help="If toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument('--cuda', type=bool, default=True, help="If toggled, cuda will be enabled by default")
     parser.add_argument('--track', action="store_false", default=True, help="If toggled, this experiment will be tracked with Weights and Biases")
-    parser.add_argument('--wandb_project_name', type=str, default="cleanRL-mujuco-v2", help="The wandb's project name")
+    parser.add_argument('--wandb_project_name', type=str, default="anchorppo-mujuco-new5", help="The wandb's project name")
     parser.add_argument('--wandb_entity', type=str, default=None, help="The entity (team) of wandb's project")
     parser.add_argument('--capture_video', type=bool, default=False, 
                         help="Whether to capture videos of the agent performances (check out `videos` folder)")
@@ -29,7 +29,7 @@ def get_config():
     parser.add_argument('--gamma', type=float, default=0.99, help="The discount factor gamma")
     parser.add_argument('--gae_lambda', type=float, default=0.95, help="The lambda for the general advantage estimation")
     parser.add_argument('--num_minibatches', type=int, default=32, help="The number of mini-batches")
-    parser.add_argument('--update_epochs', type=int, default=10, help="The K epochs to update the policy")
+    parser.add_argument('--update_epochs', type=int, default=5, help="The K epochs to update the policy")
     parser.add_argument('--norm_adv', type=bool, default=True, help="Toggles advantages normalization")
     parser.add_argument('--clip_coef', type=float, default=0.2, help="The surrogate clipping coefficient")
     parser.add_argument('--clip_vloss', type=bool, default=True, help="Toggles whether or not to use a clipped loss for the value function")

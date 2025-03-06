@@ -157,3 +157,6 @@ runs/
 draft.sh
 .vscode/
 logs/
+
+src/scripts/*.pkl
+src/scripts/*.log

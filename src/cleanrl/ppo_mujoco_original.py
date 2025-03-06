@@ -141,11 +141,10 @@ class Agent(nn.Module):
     
     # junweiluo: 增加函数
     def sample_action(self, probs):
-
         actions = []
         for _ in range(self.sample_action_num):
-            i_action = torch.tanh(probs.sample()) * self.scale
-            actions.append(i_action)
+            i_action = probs.sample()
+            actions.append(torch.tanh(i_action) * self.scale)
         actions = torch.stack(actions, dim = 1)
         log_probs = self.get_logprobs(actions, probs)
 
@@ -170,7 +169,7 @@ class Agent(nn.Module):
         if action is None:
             # action shape is (num_envs, sample_action_num, action_dim)
             action, log_probs = self.sample_action(probs)
-            return action, log_probs, probs.entropy().sum(1), self.critic(x)
+            return action, log_probs, probs.entropy().sum(1), self.critic(x), torch.softmax(probs.sample(), dim=1), action_std.mean().detach().numpy()
             # else:
             #     action = probs.sample()
             #     return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
@@ -178,7 +177,7 @@ class Agent(nn.Module):
         # ppo更新时计算新的log_probs
         log_probs = self.get_logprobs(actions = action, probs = probs)
         
-        return action, log_probs, probs.entropy().sum(1), self.critic(x)
+        return action, log_probs, probs.entropy().sum(1), self.critic(x), torch.softmax(probs.sample(), dim=1), action_std.mean().detach().numpy()
 
 
 if __name__ == "__main__":
@@ -191,7 +190,7 @@ if __name__ == "__main__":
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
 
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}__{int(time.time())}"
     if args.track:
         wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}"
         wandb.init(
@@ -243,7 +242,9 @@ if __name__ == "__main__":
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
     
-    # 增加一个episodic_returns的记录器用于对齐数据
+    probs = torch.zeros((args.num_steps, args.num_envs)+ envs.single_action_space.shape).to(device)
+    
+
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
@@ -269,8 +270,10 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(next_obs)
+                action, logprob, _, value, prob, action_std = agent.get_action_and_value(next_obs)
                 values[step] = value.flatten()
+                probs[step] = prob
+                
             actions[step] = action
             logprobs[step] = logprob
 
@@ -327,6 +330,7 @@ if __name__ == "__main__":
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
+        b_probs = probs.reshape((-1,) + envs.single_action_space.shape)
 
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
@@ -337,7 +341,7 @@ if __name__ == "__main__":
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
+                _, newlogprob, entropy, newvalue, newprobs, new_action_std = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
 
                 total_logratio = newlogprob - b_logprobs[mb_inds]
                 logratio = total_logratio[:,0]
@@ -354,16 +358,32 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
+                    approx_kl = ((ratio1 - 1) - logratio).mean()
+                    
+                    writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
+                    writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)                
+                    
+                    # ADD(junweiluo) : 新增数据
+                    total_old_approx_kl = (-ratio.log()).mean()
+                    total_approx_kl = ((ratio - 1) - ratio.log()).mean()
+                    writer.add_scalar("losses/total_old_approx_kl", old_approx_kl.item(), global_step)
+                    writer.add_scalar("losses/total_approx_kl", approx_kl.item(), global_step)
+                    
+                    kl = torch.nn.functional.kl_div(newprobs.log(), b_probs[mb_inds], reduction="batchmean")
+                    writer.add_scalar("kl", kl.item(), global_step)
+                    
+                    writer.add_scalar("charts/action_std", new_action_std)
+                    
                     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
-
+                
+                    
                 mb_advantages = b_advantages[mb_inds]
                 if args.norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - args.clip_coef), (1 + args.clip_coef))
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
@@ -388,6 +408,35 @@ if __name__ == "__main__":
                 loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
                 optimizer.step()
+                
+                # junweiluo: add adv-ratio analysis
+                # ==================================================
+                indice_larger_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() > 0)[0]
+                indice_smaller_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() < 0)[0]
+
+                adv_larger0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_larger_0])
+                adv_larger0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_larger_0])
+                adv_larger0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_larger_0])
+                adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
+                adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
+                adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
+                writer.add_scalar('adv_larger0_ratio1', adv_larger0_ratio1,)
+                writer.add_scalar('adv_larger0_ratio2', adv_larger0_ratio2,)
+                writer.add_scalar('adv_larger0_ratio', adv_larger0_ratio,)
+                writer.add_scalar('adv_smaller0_ratio1', adv_smaller0_ratio1,)
+                writer.add_scalar('adv_smaller0_ratio2', adv_smaller0_ratio2,)
+                writer.add_scalar('adv_smaller0_ratio', adv_smaller0_ratio,)
+                min_ratio, max_ratio = np.min(ratio.detach().cpu().numpy()), np.max(ratio.detach().cpu().numpy())
+                min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
+                min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
+                writer.add_scalar('imp_weight/min_ratio', min_ratio,)
+                writer.add_scalar('imp_weight/max_ratio', max_ratio,)
+                writer.add_scalar('imp_weight/min_ratio1', min_ratio1,)
+                writer.add_scalar('imp_weight/max_ratio1', max_ratio1,)
+                writer.add_scalar('imp_weight/min_ratio2', min_ratio2,)
+                writer.add_scalar('imp_weight/max_ratio2', max_ratio2,)
+                # ===================================================
+
 
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
@@ -415,12 +464,16 @@ if __name__ == "__main__":
         #     wandb.log(logs_)
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
+        
+        
+        
+        
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
-        writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
-        writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
+        # writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
+        # writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
 

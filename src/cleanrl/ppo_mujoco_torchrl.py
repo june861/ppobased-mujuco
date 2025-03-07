@@ -56,7 +56,7 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "Humanoid-v4"
+    env_id: str = "HumanoidStandup-v4"
     """the id of the environment"""
     time_aware: bool = True
     """Time aware observation"""
@@ -72,13 +72,13 @@ class Args:
     """normalize the rewards"""
     clip_reward: bool = False
     """clip the rewards"""
-    total_timesteps: int = 5000000
+    total_timesteps: int = 1000000
     """total timesteps of the experiments"""
     activation_fn: str = "tanh"
     """the activation function"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
-    num_envs: int = 2
+    num_envs: int = 8
     """the number of parallel game environments"""
     num_steps: int = 1024
     """the number of steps to run in each environment per policy rollout"""

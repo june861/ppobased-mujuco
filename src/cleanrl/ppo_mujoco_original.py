@@ -99,6 +99,7 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
             env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         else:
             env = gym.make(env_id)
+
         env = gym.wrappers.FlattenObservation(env)  # deal with dm_control's Dict observation space
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = gym.wrappers.ClipAction(env)
@@ -143,8 +144,8 @@ class Agent(nn.Module):
     def sample_action(self, probs):
         actions = []
         for _ in range(self.sample_action_num):
-            i_action = probs.sample()
-            actions.append(torch.tanh(i_action) * self.scale)
+            i_action = torch.tanh(probs.sample()) * self.scale
+            actions.append(i_action)
         actions = torch.stack(actions, dim = 1)
         log_probs = self.get_logprobs(actions, probs)
 
@@ -169,7 +170,7 @@ class Agent(nn.Module):
         if action is None:
             # action shape is (num_envs, sample_action_num, action_dim)
             action, log_probs = self.sample_action(probs)
-            return action, log_probs, probs.entropy().sum(1), self.critic(x), torch.softmax(probs.sample(), dim=1), action_std.mean().detach().numpy()
+            return action, log_probs, probs.entropy().sum(1), self.critic(x)
             # else:
             #     action = probs.sample()
             #     return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
@@ -177,8 +178,7 @@ class Agent(nn.Module):
         # ppo更新时计算新的log_probs
         log_probs = self.get_logprobs(actions = action, probs = probs)
         
-        return action, log_probs, probs.entropy().sum(1), self.critic(x), torch.softmax(probs.sample(), dim=1), action_std.mean().detach().numpy()
-
+        return action, log_probs, probs.entropy().sum(1), self.critic(x)
 
 if __name__ == "__main__":
     # args = tyro.cli(Args)
@@ -193,6 +193,7 @@ if __name__ == "__main__":
     run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}__{int(time.time())}"
     if args.track:
         wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}"
+        logger.info(f"use wandb to log.Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
         wandb.init(
             project=args.wandb_project_name,
             group=wandb_group,
@@ -241,8 +242,7 @@ if __name__ == "__main__":
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    
-    probs = torch.zeros((args.num_steps, args.num_envs)+ envs.single_action_space.shape).to(device)
+
     
 
 
@@ -270,9 +270,9 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value, prob, action_std = agent.get_action_and_value(next_obs)
+                action, logprob, _, value = agent.get_action_and_value(next_obs)
                 values[step] = value.flatten()
-                probs[step] = prob
+
                 
             actions[step] = action
             logprobs[step] = logprob
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         # record reward
         traj_total_rewards = torch.sum(rewards).numpy()
         traj_mean_rewards = traj_total_rewards / args.num_envs
-        logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
+        # logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
         writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
         writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
         
@@ -330,7 +330,7 @@ if __name__ == "__main__":
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
-        b_probs = probs.reshape((-1,) + envs.single_action_space.shape)
+
 
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
@@ -341,7 +341,7 @@ if __name__ == "__main__":
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue, newprobs, new_action_std = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
+                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
 
                 total_logratio = newlogprob - b_logprobs[mb_inds]
                 logratio = total_logratio[:,0]
@@ -369,10 +369,6 @@ if __name__ == "__main__":
                     writer.add_scalar("losses/total_old_approx_kl", old_approx_kl.item(), global_step)
                     writer.add_scalar("losses/total_approx_kl", approx_kl.item(), global_step)
                     
-                    kl = torch.nn.functional.kl_div(newprobs.log(), b_probs[mb_inds], reduction="batchmean")
-                    writer.add_scalar("kl", kl.item(), global_step)
-                    
-                    writer.add_scalar("charts/action_std", new_action_std)
                     
                     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
                 
@@ -420,12 +416,12 @@ if __name__ == "__main__":
                 adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
                 adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
                 adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
-                writer.add_scalar('adv_larger0_ratio1', adv_larger0_ratio1,)
-                writer.add_scalar('adv_larger0_ratio2', adv_larger0_ratio2,)
-                writer.add_scalar('adv_larger0_ratio', adv_larger0_ratio,)
-                writer.add_scalar('adv_smaller0_ratio1', adv_smaller0_ratio1,)
-                writer.add_scalar('adv_smaller0_ratio2', adv_smaller0_ratio2,)
-                writer.add_scalar('adv_smaller0_ratio', adv_smaller0_ratio,)
+                writer.add_scalar('adv/adv_larger0_ratio1', adv_larger0_ratio1,)
+                writer.add_scalar('adv/adv_larger0_ratio2', adv_larger0_ratio2,)
+                writer.add_scalar('adv/adv_larger0_ratio', adv_larger0_ratio,)
+                writer.add_scalar('adv/adv_smaller0_ratio1', adv_smaller0_ratio1,)
+                writer.add_scalar('adv/adv_smaller0_ratio2', adv_smaller0_ratio2,)
+                writer.add_scalar('adv/adv_smaller0_ratio', adv_smaller0_ratio,)
                 min_ratio, max_ratio = np.min(ratio.detach().cpu().numpy()), np.max(ratio.detach().cpu().numpy())
                 min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
                 min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
@@ -435,6 +431,20 @@ if __name__ == "__main__":
                 writer.add_scalar('imp_weight/max_ratio1', max_ratio1,)
                 writer.add_scalar('imp_weight/min_ratio2', min_ratio2,)
                 writer.add_scalar('imp_weight/max_ratio2', max_ratio2,)
+                
+                ratio_per = np.sum(((1 - args.clip_coef) <= ratio.detach().cpu().numpy()) & (ratio.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio.shape[0]
+                ratio1_per = np.sum(((1 - args.clip_coef) <= ratio1.detach().cpu().numpy()) & (ratio1.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio1.shape[0]
+                ratio2_per = np.sum(((1 - args.clip_coef) <= ratio2.cpu().numpy()) & (ratio2.cpu().numpy() <= (1 +  args.clip_coef)))  / ratio2.shape[0]
+                writer.add_scalar('percentage/ratio_per',  ratio_per)
+                writer.add_scalar('percentage/ratio1_per',  ratio1_per)
+                writer.add_scalar('percentage/ratio2_per',  ratio2_per)
+
+                # junweiluo： 增加指标
+                writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()))
+                writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()))
+                writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()))
+                
+                
                 # ===================================================
 
 
@@ -477,10 +487,7 @@ if __name__ == "__main__":
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
 
-        # junweiluo： 增加指标
-        writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()), global_step)
-        writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()), global_step)
-        writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()), global_step)
+
 
         logger.info(f"SPS: {int(global_step / (time.time() - start_time))}")
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)

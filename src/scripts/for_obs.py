@@ -9,7 +9,14 @@
 
 import numpy as np
 import gymnasium as gym
+from torch.utils.tensorboard import SummaryWriter
 
+run_name = f'tensorboard_test'
+writer = SummaryWriter(f"runs/{run_name}")
+for i in range(1000):
+
+    writer.add_scalar("charts/test",i, i)
+    
 
 
 class DiscreteActionWrapper(gym.ActionWrapper):

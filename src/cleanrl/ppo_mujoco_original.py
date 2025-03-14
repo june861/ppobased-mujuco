@@ -144,7 +144,9 @@ class Agent(nn.Module):
     def sample_action(self, probs):
         actions = []
         for _ in range(self.sample_action_num):
-            i_action = torch.tanh(probs.sample()) * self.scale
+            # i_action = torch.tanh(probs.sample()) * self.scale
+            # actions.append(i_action)
+            i_action = probs.sample()
             actions.append(i_action)
         actions = torch.stack(actions, dim = 1)
         log_probs = self.get_logprobs(actions, probs)
@@ -190,9 +192,9 @@ if __name__ == "__main__":
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
 
-    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}__{int(time.time())}"
+    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}_{int(time.time())}"
     if args.track:
-        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}"
+        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}__pow2"
         logger.info(f"use wandb to log.Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
         wandb.init(
             project=args.wandb_project_name,
@@ -201,7 +203,7 @@ if __name__ == "__main__":
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
-            monitor_gym=True,
+            # monitor_gym=True,
             save_code=True,
         )
 
@@ -252,6 +254,9 @@ if __name__ == "__main__":
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
+    
+    batch_index = -1
+
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -301,9 +306,9 @@ if __name__ == "__main__":
         # record reward
         traj_total_rewards = torch.sum(rewards).numpy()
         traj_mean_rewards = traj_total_rewards / args.num_envs
-        # logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
-        writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
-        writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
+        logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
+        # writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
+        # writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
         
         # bootstrap value if not done
         with torch.no_grad():
@@ -331,13 +336,18 @@ if __name__ == "__main__":
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
-
+        # 采样新旧策略的数据点用于绘制分布
+        dist_sample_points_x = np.linspace(-2, 2, 500) 
+        dist_sample_points = {}
+        
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
+
             for start in range(0, args.batch_size, args.minibatch_size):
+
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
@@ -350,25 +360,70 @@ if __name__ == "__main__":
                 # junweiluo：增加指标记录
                 ratio1 = logratio.exp()
                 if args.sample_action_num > 1:
+                    # ratio2 prod methods 
                     ratio2 = torch.prod(total_logratio[:,1:].exp(), dim=1).detach()
+                    # ratio2 mean methods
+                    # ratio2 = torch.sum(total_logratio[:,1:].exp(), dim=1).detach() / (args.sample_action_num - 1)
                 else:
                     ratio2 = torch.ones_like(ratio1).detach()
+                    # ratio2 = ratio1.detach()
                 ratio = ratio1 * ratio2
 
                 with torch.no_grad():
+                    batch_index += 1
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio1 - 1) - logratio).mean()
                     
-                    writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
-                    writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)                
+                    writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), batch_index)
+                    writer.add_scalar("losses/approx_kl", approx_kl.item(), batch_index)                
                     
                     # ADD(junweiluo) : 新增数据
                     total_old_approx_kl = (-ratio.log()).mean()
                     total_approx_kl = ((ratio - 1) - ratio.log()).mean()
-                    writer.add_scalar("losses/total_old_approx_kl", old_approx_kl.item(), global_step)
-                    writer.add_scalar("losses/total_approx_kl", approx_kl.item(), global_step)
+                    writer.add_scalar("losses/total_old_approx_kl", old_approx_kl.item(),  batch_index)
+                    writer.add_scalar("losses/total_approx_kl", approx_kl.item() , batch_index)
+
+                    # junweiluo： 增加指标
+                    # ==================== 优势函数ratio ==============================
+                    indice_larger_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() > 0)[0]
+                    indice_smaller_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() < 0)[0]
+                    adv_larger0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_larger_0])
+                    adv_larger0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_larger_0])
+                    adv_larger0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_larger_0])
+                    adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
+                    adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
+                    adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
+                    writer.add_scalar('adv/adv_larger0_ratio1', adv_larger0_ratio1, batch_index)
+                    writer.add_scalar('adv/adv_larger0_ratio2', adv_larger0_ratio2, batch_index)
+                    writer.add_scalar('adv/adv_larger0_ratio', adv_larger0_ratio, batch_index)
+                    writer.add_scalar('adv/adv_smaller0_ratio1', adv_smaller0_ratio1, batch_index)
+                    writer.add_scalar('adv/adv_smaller0_ratio2', adv_smaller0_ratio2, batch_index)
+                    writer.add_scalar('adv/adv_smaller0_ratio', adv_smaller0_ratio, batch_index)
+                    min_ratio, max_ratio = np.min(ratio.detach().cpu().numpy()), np.max(ratio.detach().cpu().numpy())
+                    min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
+                    min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
+                    writer.add_scalar('imp_weight/min_ratio', min_ratio, batch_index)
+                    writer.add_scalar('imp_weight/max_ratio', max_ratio, batch_index)
+                    writer.add_scalar('imp_weight/min_ratio1', min_ratio1, batch_index)
+                    writer.add_scalar('imp_weight/max_ratio1', max_ratio1, batch_index)
+                    writer.add_scalar('imp_weight/min_ratio2', min_ratio2, batch_index)
+                    writer.add_scalar('imp_weight/max_ratio2', max_ratio2, batch_index)
                     
+                    # ratio_per = np.sum(((1 - args.clip_coef) <= ratio.detach().cpu().numpy()) & (ratio.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio.shape[0]
+                    # ratio1_per = np.sum(((1 - args.clip_coef) <= ratio1.detach().cpu().numpy()) & (ratio1.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio1.shape[0]
+                    # ratio2_per = np.sum(((1 - args.clip_coef) <= ratio2.cpu().numpy()) & (ratio2.cpu().numpy() <= (1 +  args.clip_coef)))  / ratio2.shape[0]
+                    
+                    ratio_per = np.sum((np.abs(ratio.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio.shape[0]
+                    ratio1_per = np.sum((np.abs(ratio1.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio1.shape[0]
+                    ratio2_per = np.sum((np.abs(ratio2.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio2.shape[0]
+                    
+                    writer.add_scalar('percentage/ratio_per',  ratio_per, batch_index)
+                    writer.add_scalar('percentage/ratio1_per',  ratio1_per, batch_index)
+                    writer.add_scalar('percentage/ratio2_per',  ratio2_per, batch_index)
+                    writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()), batch_index)
+                    writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()), batch_index)
+                    writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()), batch_index)
                     
                     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
                 
@@ -402,47 +457,11 @@ if __name__ == "__main__":
 
                 optimizer.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
+                grad = nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
                 optimizer.step()
                 
-                # junweiluo: add adv-ratio analysis
-                # ==================================================
-                indice_larger_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() > 0)[0]
-                indice_smaller_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() < 0)[0]
+                writer.add_scalar("losses/grad_norm", grad, batch_index)
 
-                adv_larger0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_larger_0])
-                adv_larger0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_larger_0])
-                adv_larger0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_larger_0])
-                adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
-                adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
-                adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
-                writer.add_scalar('adv/adv_larger0_ratio1', adv_larger0_ratio1,)
-                writer.add_scalar('adv/adv_larger0_ratio2', adv_larger0_ratio2,)
-                writer.add_scalar('adv/adv_larger0_ratio', adv_larger0_ratio,)
-                writer.add_scalar('adv/adv_smaller0_ratio1', adv_smaller0_ratio1,)
-                writer.add_scalar('adv/adv_smaller0_ratio2', adv_smaller0_ratio2,)
-                writer.add_scalar('adv/adv_smaller0_ratio', adv_smaller0_ratio,)
-                min_ratio, max_ratio = np.min(ratio.detach().cpu().numpy()), np.max(ratio.detach().cpu().numpy())
-                min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
-                min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
-                writer.add_scalar('imp_weight/min_ratio', min_ratio,)
-                writer.add_scalar('imp_weight/max_ratio', max_ratio,)
-                writer.add_scalar('imp_weight/min_ratio1', min_ratio1,)
-                writer.add_scalar('imp_weight/max_ratio1', max_ratio1,)
-                writer.add_scalar('imp_weight/min_ratio2', min_ratio2,)
-                writer.add_scalar('imp_weight/max_ratio2', max_ratio2,)
-                
-                ratio_per = np.sum(((1 - args.clip_coef) <= ratio.detach().cpu().numpy()) & (ratio.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio.shape[0]
-                ratio1_per = np.sum(((1 - args.clip_coef) <= ratio1.detach().cpu().numpy()) & (ratio1.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio1.shape[0]
-                ratio2_per = np.sum(((1 - args.clip_coef) <= ratio2.cpu().numpy()) & (ratio2.cpu().numpy() <= (1 +  args.clip_coef)))  / ratio2.shape[0]
-                writer.add_scalar('percentage/ratio_per',  ratio_per)
-                writer.add_scalar('percentage/ratio1_per',  ratio1_per)
-                writer.add_scalar('percentage/ratio2_per',  ratio2_per)
-
-                # junweiluo： 增加指标
-                writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()))
-                writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()))
-                writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()))
                 
                 
                 # ===================================================

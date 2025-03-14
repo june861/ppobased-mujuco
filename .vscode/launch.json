@@ -12,14 +12,12 @@
             "console": "integratedTerminal",
             "args": [
                 "--exp_name", "debugger_test",
-                "--seed", "0",
+                "--seed", "1",
                 "--env_id", "HumanoidStandup-v4",
                 "--wandb_project_name", "AnchorPPO-Mujuco-supply",
                 "--track",
-                "--sample_action_num", "1",
-                "--total_timesteps", "100000",
-                "--num_envs", "8",
-                "--clip_coef", "0.2",
+                "--sample_action_num", "5",
+                "--update_epoch", "10"
             ],
             "justMyCode": false,
         },

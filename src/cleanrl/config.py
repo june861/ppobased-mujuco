@@ -1,5 +1,5 @@
 import argparse
-
+from loguru import logger
 def get_config():
     parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")
     
@@ -24,12 +24,12 @@ def get_config():
     parser.add_argument('--total_timesteps', type=int, default=1000000, help="Total timesteps of the experiments")
     parser.add_argument('--learning_rate', type=float, default=3e-4, help="The learning rate of the optimizer")
     parser.add_argument('--num_envs', type=int, default=8, help="The number of parallel game environments")
-    parser.add_argument('--num_steps', type=int, default=2048, help="The number of steps to run in each environment per policy rollout")
+    parser.add_argument('--num_steps', type=int, default=256, help="The number of steps to run in each environment per policy rollout")
     parser.add_argument('--anneal_lr', type=bool, default=True, help="Toggle learning rate annealing for policy and value networks")
     parser.add_argument('--gamma', type=float, default=0.99, help="The discount factor gamma")
     parser.add_argument('--gae_lambda', type=float, default=0.95, help="The lambda for the general advantage estimation")
-    parser.add_argument('--num_minibatches', type=int, default=32, help="The number of mini-batches")
-    parser.add_argument('--update_epochs', type=int, default=5, help="The K epochs to update the policy")
+    parser.add_argument('--num_minibatches', type=int, default=4, help="The number of mini-batches")
+    parser.add_argument('--update_epochs', type=int, default=10, help="The K epochs to update the policy")
     parser.add_argument('--norm_adv', type=bool, default=True, help="Toggles advantages normalization")
     parser.add_argument('--clip_coef', type=float, default=0.2, help="The surrogate clipping coefficient")
     parser.add_argument('--clip_vloss', type=bool, default=True, help="Toggles whether or not to use a clipped loss for the value function")
@@ -46,6 +46,7 @@ def get_config():
     # Action sample parameters
     parser.add_argument('--sample_action_num', type=int, default=None, help="Number of actions to sample")
     parser.add_argument('--wandb_group', type=str, default=None, help="the wandb group name")
+    parser.add_argument('--noise_exp', action='store_true', default=False, help="noise exp")
 
-    
+    logger.info(f'setting finish!')
     return parser

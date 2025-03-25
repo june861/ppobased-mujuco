@@ -23,8 +23,8 @@ LAB_NAME=$(id -un | tr "[:upper:]" "[:lower:]" | tr -d ".")
 # You can find the acceleration options in the compose.yaml file
 # by looking at the services with names dev-local-ACCELERATION. 
 PROJECT_ROOT_AT=/project/no-representation-no-trust
-ACCELERATION=cpu
-WANDB_API_KEY=
+ACCELERATION=cuda
+WANDB_API_KEY=53deb73193376dd5559311eb7bfea5048751136e
 
 ####################
 # Project-specific environment variables.

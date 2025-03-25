@@ -1,11 +1,19 @@
 import argparse
-from loguru import logger
+import sys
+import os
+import torch
+import time
+from base import getLogger
+from prettytable import PrettyTable
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# from loguru import logger
 def get_config():
     parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")
     
     # Experiment arguments
-    parser.add_argument('--exp_name', type=str, default=None, required=True,
-                        help="The name of this experiment")
+    parser.add_argument('--exp_name', type=str, default="HalfCheetah-v4",help="The name of this experiment")
     parser.add_argument('--seed', type=int, default=1, help="Seed of the experiment")
     parser.add_argument('--torch_deterministic', type=bool, default=True, 
                         help="If toggled, `torch.backends.cudnn.deterministic=False`")
@@ -32,6 +40,8 @@ def get_config():
     parser.add_argument('--update_epochs', type=int, default=10, help="The K epochs to update the policy")
     parser.add_argument('--norm_adv', type=bool, default=True, help="Toggles advantages normalization")
     parser.add_argument('--clip_coef', type=float, default=0.2, help="The surrogate clipping coefficient")
+    parser.add_argument('--clip_coef_2', type=float, default=0.2, help="ratio2 clipping coefficient")
+    
     parser.add_argument('--clip_vloss', type=bool, default=True, help="Toggles whether or not to use a clipped loss for the value function")
     parser.add_argument('--ent_coef', type=float, default=0.0, help="Coefficient of the entropy")
     parser.add_argument('--vf_coef', type=float, default=0.5, help="Coefficient of the value function")
@@ -48,5 +58,24 @@ def get_config():
     parser.add_argument('--wandb_group', type=str, default=None, help="the wandb group name")
     parser.add_argument('--noise_exp', action='store_true', default=False, help="noise exp")
 
-    logger.info(f'setting finish!')
-    return parser
+
+    # batch size 设计
+    args = parser.parse_args(sys.argv[1:])
+    args.batch_size = int(args.num_envs * args.num_steps)
+    args.minibatch_size = int(args.batch_size // args.num_minibatches)
+    args.num_iterations = args.total_timesteps // args.batch_size
+    args.logger = getLogger(f"{args.env_id}_{int(time.time())}","colored")
+    args.device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    # 表格输出配置项
+    config_table = PrettyTable()
+    config_table.field_names = ["Parameter", "Value"]
+
+    # 添加配置项到表格
+    for arg in vars(args):
+        config_table.add_row([arg, getattr(args, arg)])
+
+    # 打印配置表格
+    args.logger.info(f'\n{config_table}')
+
+    # logger.info(f'setting finish!')
+    return args

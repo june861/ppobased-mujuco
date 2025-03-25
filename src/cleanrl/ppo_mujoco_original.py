@@ -4,93 +4,20 @@ import os
 import random
 import time
 import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 import wandb
-from dataclasses import dataclass
-
 import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
-from config import get_config
+from utils.mujoco_config import get_config
 from torch.distributions.normal import Normal
-from loguru import logger
+from utils.mujoco_config import get_config
+from utils.utils import compute_advantages
 from torch.utils.tensorboard import SummaryWriter
 
-
-@dataclass
-class Args:
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """the name of this experiment"""
-    seed: int = 1
-    """seed of the experiment"""
-    torch_deterministic: bool = True
-    """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
-    track: bool = False
-    """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
-    """the wandb's project name"""
-    wandb_entity: str = None
-    """the entity (team) of wandb's project"""
-    capture_video: bool = False
-    """whether to capture videos of the agent performances (check out `videos` folder)"""
-    save_model: bool = False
-    """whether to save model into the `runs/{run_name}` folder"""
-    upload_model: bool = False
-    """whether to upload the saved model to huggingface"""
-    hf_entity: str = ""
-    """the user or org name of the model repository from the Hugging Face Hub"""
-
-    # Algorithm specific arguments
-    env_id: str = "HalfCheetah-v4"
-    """the id of the environment"""
-    total_timesteps: int = 1000000
-    """total timesteps of the experiments"""
-    learning_rate: float = 3e-4
-    """the learning rate of the optimizer"""
-    num_envs: int = 8
-    """the number of parallel game environments"""
-    num_steps: int = 2048
-    """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = True
-    """Toggle learning rate annealing for policy and value networks"""
-    gamma: float = 0.99
-    """the discount factor gamma"""
-    gae_lambda: float = 0.95
-    """the lambda for the general advantage estimation"""
-    num_minibatches: int = 32
-    """the number of mini-batches"""
-    # 准备测试一下更小的epochs
-    update_epochs: int = 10
-    """the K epochs to update the policy"""
-    norm_adv: bool = True
-    """Toggles advantages normalization"""
-    clip_coef: float = 0.2
-    """the surrogate clipping coefficient"""
-    clip_vloss: bool = True
-    """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.0
-    """coefficient of the entropy"""
-    vf_coef: float = 0.5
-    """coefficient of the value function"""
-    max_grad_norm: float = 0.5
-    """the maximum norm for the gradient clipping"""
-    target_kl: float = None
-    """the target KL divergence threshold"""
-
-    # to be filled in runtime
-    batch_size: int = 0
-    """the batch size (computed in runtime)"""
-    minibatch_size: int = 0
-    """the mini-batch size (computed in runtime)"""
-    num_iterations: int = 0
-    """the number of iterations (computed in runtime)"""
-
-    """ action sample parameters """
-    sample_action_num: int = 2
 
 def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
@@ -172,7 +99,7 @@ class Agent(nn.Module):
         if action is None:
             # action shape is (num_envs, sample_action_num, action_dim)
             action, log_probs = self.sample_action(probs)
-            return action, log_probs, probs.entropy().sum(1), self.critic(x)
+            return action, log_probs, probs.entropy().sum(1), self.critic(x), probs
             # else:
             #     action = probs.sample()
             #     return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
@@ -180,22 +107,20 @@ class Agent(nn.Module):
         # ppo更新时计算新的log_probs
         log_probs = self.get_logprobs(actions = action, probs = probs)
         
-        return action, log_probs, probs.entropy().sum(1), self.critic(x)
+        return action, log_probs, probs.entropy().sum(1), self.critic(x), probs
+
+
+def compute_kld(mu_1, sigma_1, mu_2, sigma_2):
+    return torch.log(sigma_2 / sigma_1) + ((mu_1 - mu_2) ** 2 + (sigma_1 ** 2 - sigma_2 ** 2)) / (2 * sigma_2 ** 2)
+
 
 if __name__ == "__main__":
     # args = tyro.cli(Args)
-    parser = get_config()
-    args = parser.parse_args(sys.argv[1:])
-
-    # batch size 设计
-    args.batch_size = int(args.num_envs * args.num_steps)
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)
-    args.num_iterations = args.total_timesteps // args.batch_size
-
-    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}_{int(time.time())}"
+    args = get_config()
+    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}_{int(time.time())}_ratio2clamp_grad"
     if args.track:
-        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}__pow2"
-        logger.info(f"use wandb to log.Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
+        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}_clipcoef{str(args.clip_coef)}__ratio2clamp_v1_grad"
+        args.logger.info(f"use wandb to log.Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
         wandb.init(
             project=args.wandb_project_name,
             group=wandb_group,
@@ -220,7 +145,8 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    
+
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
@@ -230,33 +156,32 @@ if __name__ == "__main__":
     if args.sample_action_num == None:
         args.sample_action_num = envs.single_action_space.shape[0]
     
-    logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
+    # logger.info(f"env is {args.env_id}, n_rollout_thread is {args.num_envs}, sample action num is {args.sample_action_num}")
 
 
-    agent = Agent(envs, sample_action_num = args.sample_action_num, max_scale = envs.single_action_space.high[0]).to(device)
+    agent = Agent(envs, sample_action_num = args.sample_action_num, max_scale = envs.single_action_space.high[0]).to(args.device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
     # junweiluo: 修改一下replay buffer的形状
-    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
-    actions = torch.zeros((args.num_steps, args.num_envs) + (args.sample_action_num, ) + envs.single_action_space.shape).to(device)
-    logprobs = torch.zeros((args.num_steps, args.num_envs)+ (args.sample_action_num, )).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
-
+    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(args.device)
+    actions = torch.zeros((args.num_steps, args.num_envs) + (args.sample_action_num, ) + envs.single_action_space.shape).to(args.device)
+    logprobs = torch.zeros((args.num_steps, args.num_envs)+ (args.sample_action_num, )).to(args.device)
+    rewards = torch.zeros((args.num_steps, args.num_envs)).to(args.device)
+    dones = torch.zeros((args.num_steps, args.num_envs)).to(args.device)
+    values = torch.zeros((args.num_steps, args.num_envs)).to(args.device)
+    means = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(args.device)
+    stds = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(args.device)
     
-
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
-    next_obs = torch.Tensor(next_obs).to(device)
-    next_done = torch.zeros(args.num_envs).to(device)
+    next_obs = torch.Tensor(next_obs).to(args.device)
+    next_done = torch.zeros(args.num_envs).to(args.device)
     
     batch_index = -1
-
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -275,56 +200,56 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(next_obs)
+                action, logprob, _, value, mean_std = agent.get_action_and_value(next_obs)
                 values[step] = value.flatten()
 
                 
             actions[step] = action
             logprobs[step] = logprob
-
+            means[step] = mean_std.loc
+            stds[step] = mean_std.scale
+            
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action[:,0,:].cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
-            next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+            rewards[step] = torch.tensor(reward).to(args.device).view(-1)
+            next_obs, next_done = torch.Tensor(next_obs).to(args.device), torch.Tensor(next_done).to(args.device)
 
             if "final_info" in infos:
                 for index, info in enumerate(infos["final_info"]):
                     if info and "episode" in info:
-                        # logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
+                        args.logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"] , global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
                         writer.add_scalar("charts/global_step", global_step)
                         total_return += info["episode"]["r"]
-                        # if args.track:
-                        #     wandb.log({
-                        #         "episodic_return": info["episode"]["r"],
-                        #         "episodic_length": info["episode"]["l"],
-                        #         # "global_step": global_step,
-                        #     })
 
-        # record reward
-        traj_total_rewards = torch.sum(rewards).numpy()
-        traj_mean_rewards = traj_total_rewards / args.num_envs
-        logger.info(f"global_step = {global_step}, mean reward = {traj_mean_rewards}, total reward = {traj_total_rewards}")
-        # writer.add_scalar("trajs/traj_total_rewards", traj_total_rewards, global_step)
-        # writer.add_scalar("trajs/traj_mean_rewards", traj_mean_rewards, global_step)
         
         # bootstrap value if not done
-        with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
-            advantages = torch.zeros_like(rewards).to(device)
-            lastgaelam = 0
-            for t in reversed(range(args.num_steps)):
-                if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
-                else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
-                delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
-            returns = advantages + values
+        # with torch.no_grad():
+        #     next_value = agent.get_value(next_obs).reshape(1, -1)
+        #     advantages = torch.zeros_like(rewards).to(args.device)
+        #     lastgaelam = 0
+        #     for t in reversed(range(args.num_steps)):
+        #         if t == args.num_steps - 1:
+        #             nextnonterminal = 1.0 - next_done
+        #             nextvalues = next_value
+        #         else:
+        #             nextnonterminal = 1.0 - dones[t + 1]
+        #             nextvalues = values[t + 1]
+        #         delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+        #         advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+        #     returns = advantages + values
+
+        returns, advantages = compute_advantages(
+            args = args, 
+            agent = agent, 
+            rewards = rewards, 
+            values = values, 
+            next_obs = next_obs, 
+            next_done = next_done, 
+            dones = dones
+        )
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
@@ -335,6 +260,9 @@ if __name__ == "__main__":
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
+        b_means = means.reshape(args.batch_size, -1)
+        b_stds = stds.reshape(args.batch_size, -1)
+        
 
         # 采样新旧策略的数据点用于绘制分布
         dist_sample_points_x = np.linspace(-2, 2, 500) 
@@ -345,13 +273,17 @@ if __name__ == "__main__":
         clipfracs = []
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
+            ratio_clipfracs, ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0, 0.0
+            min_ratio, max_ratio = 10.0, 0.0
+            min_ratio1, max_ratio1 =  10.0, 0.0
+            min_ratio2, max_ratio2 = 10.0, 0.0
 
             for start in range(0, args.batch_size, args.minibatch_size):
 
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
+                _, newlogprob, entropy, newvalue, new_mean_std = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
 
                 total_logratio = newlogprob - b_logprobs[mb_inds]
                 logratio = total_logratio[:,0]
@@ -360,10 +292,8 @@ if __name__ == "__main__":
                 # junweiluo：增加指标记录
                 ratio1 = logratio.exp()
                 if args.sample_action_num > 1:
-                    # ratio2 prod methods 
-                    ratio2 = torch.prod(total_logratio[:,1:].exp(), dim=1).detach()
-                    # ratio2 mean methods
-                    # ratio2 = torch.sum(total_logratio[:,1:].exp(), dim=1).detach() / (args.sample_action_num - 1)
+                    ratio2 = torch.sum(total_logratio[:,1:], dim=1).exp()
+                    ratio2 = torch.clamp(ratio2, 1 - args.clip_coef, 1 + args.clip_coef)
                 else:
                     ratio2 = torch.ones_like(ratio1).detach()
                     # ratio2 = ratio1.detach()
@@ -374,58 +304,55 @@ if __name__ == "__main__":
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio1 - 1) - logratio).mean()
-                    
                     writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), batch_index)
-                    writer.add_scalar("losses/approx_kl", approx_kl.item(), batch_index)                
+                    writer.add_scalar("losses/approx_kl", approx_kl.item(),  batch_index)                
                     
                     # ADD(junweiluo) : 新增数据
                     total_old_approx_kl = (-ratio.log()).mean()
                     total_approx_kl = ((ratio - 1) - ratio.log()).mean()
                     writer.add_scalar("losses/total_old_approx_kl", old_approx_kl.item(),  batch_index)
                     writer.add_scalar("losses/total_approx_kl", approx_kl.item() , batch_index)
+                    
+                    
+                    # use mean and std to calculate kl
+                    new_mean = new_mean_std.loc
+                    new_std = new_mean_std.scale
+                    kl = compute_kld(b_means[mb_inds], b_stds[mb_inds], new_mean, new_std)
+                    writer.add_scalar("losses/kl", kl.mean().detach().cpu().item() , batch_index)
+                    
 
                     # junweiluo： 增加指标
                     # ==================== 优势函数ratio ==============================
-                    indice_larger_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() > 0)[0]
-                    indice_smaller_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() < 0)[0]
-                    adv_larger0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_larger_0])
-                    adv_larger0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_larger_0])
-                    adv_larger0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_larger_0])
-                    adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
-                    adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
-                    adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
-                    writer.add_scalar('adv/adv_larger0_ratio1', adv_larger0_ratio1, batch_index)
-                    writer.add_scalar('adv/adv_larger0_ratio2', adv_larger0_ratio2, batch_index)
-                    writer.add_scalar('adv/adv_larger0_ratio', adv_larger0_ratio, batch_index)
-                    writer.add_scalar('adv/adv_smaller0_ratio1', adv_smaller0_ratio1, batch_index)
-                    writer.add_scalar('adv/adv_smaller0_ratio2', adv_smaller0_ratio2, batch_index)
-                    writer.add_scalar('adv/adv_smaller0_ratio', adv_smaller0_ratio, batch_index)
-                    min_ratio, max_ratio = np.min(ratio.detach().cpu().numpy()), np.max(ratio.detach().cpu().numpy())
-                    min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
-                    min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
-                    writer.add_scalar('imp_weight/min_ratio', min_ratio, batch_index)
-                    writer.add_scalar('imp_weight/max_ratio', max_ratio, batch_index)
-                    writer.add_scalar('imp_weight/min_ratio1', min_ratio1, batch_index)
-                    writer.add_scalar('imp_weight/max_ratio1', max_ratio1, batch_index)
-                    writer.add_scalar('imp_weight/min_ratio2', min_ratio2, batch_index)
-                    writer.add_scalar('imp_weight/max_ratio2', max_ratio2, batch_index)
+                    # indice_larger_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() > 0)[0]
+                    # indice_smaller_0 = np.where(b_returns[mb_inds].detach().cpu().numpy() < 0)[0]
+                    # adv_larger0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_larger_0])
+                    # adv_larger0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_larger_0])
+                    # adv_larger0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_larger_0])
+                    # adv_smaller0_ratio1 = np.mean(ratio1.detach().cpu().numpy()[indice_smaller_0])
+                    # adv_smaller0_ratio2 = np.mean(ratio2.detach().cpu().numpy()[indice_smaller_0])
+                    # adv_smaller0_ratio = np.mean(ratio.detach().cpu().numpy()[indice_smaller_0])
+                    # writer.add_scalar('adv/adv_larger0_ratio1', adv_larger0_ratio1, batch_index)
+                    # writer.add_scalar('adv/adv_larger0_ratio2', adv_larger0_ratio2, batch_index)
+                    # writer.add_scalar('adv/adv_larger0_ratio', adv_larger0_ratio, batch_index)
+                    # writer.add_scalar('adv/adv_smaller0_ratio1', adv_smaller0_ratio1, batch_index)
+                    # writer.add_scalar('adv/adv_smaller0_ratio2', adv_smaller0_ratio2, batch_index)
+                    # writer.add_scalar('adv/adv_smaller0_ratio', adv_smaller0_ratio, batch_index)
+
+                    min_ratio, max_ratio = min(np.min(ratio.detach().cpu().numpy()), min_ratio), max(np.max(ratio.detach().cpu().numpy()), max_ratio)
+                    min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
+                    min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
+
                     
-                    # ratio_per = np.sum(((1 - args.clip_coef) <= ratio.detach().cpu().numpy()) & (ratio.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio.shape[0]
-                    # ratio1_per = np.sum(((1 - args.clip_coef) <= ratio1.detach().cpu().numpy()) & (ratio1.detach().cpu().numpy() <= (1 +  args.clip_coef)))  / ratio1.shape[0]
-                    # ratio2_per = np.sum(((1 - args.clip_coef) <= ratio2.cpu().numpy()) & (ratio2.cpu().numpy() <= (1 +  args.clip_coef)))  / ratio2.shape[0]
+                    ratio_clipfracs += (torch.abs(ratio.detach().cpu() - 1.0) < args.clip_coef).float().sum()
+                    ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < args.clip_coef).float().sum()
+                    ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < args.clip_coef).float().sum()
                     
-                    ratio_per = np.sum((np.abs(ratio.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio.shape[0]
-                    ratio1_per = np.sum((np.abs(ratio1.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio1.shape[0]
-                    ratio2_per = np.sum((np.abs(ratio2.detach().cpu().numpy() - 1.0) <= args.clip_coef))  / ratio2.shape[0]
-                    
-                    writer.add_scalar('percentage/ratio_per',  ratio_per, batch_index)
-                    writer.add_scalar('percentage/ratio1_per',  ratio1_per, batch_index)
-                    writer.add_scalar('percentage/ratio2_per',  ratio2_per, batch_index)
+
                     writer.add_scalar("imp_weight/ratio", np.mean(ratio.detach().cpu().numpy()), batch_index)
                     writer.add_scalar("imp_weight/ratio1", np.mean(ratio1.detach().cpu().numpy()), batch_index)
                     writer.add_scalar("imp_weight/ratio2", np.mean(ratio2.detach().cpu().numpy()), batch_index)
                     
-                    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+                    # clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
                 
                     
                 mb_advantages = b_advantages[mb_inds]
@@ -463,9 +390,17 @@ if __name__ == "__main__":
                 writer.add_scalar("losses/grad_norm", grad, batch_index)
 
                 
-                
-                # ===================================================
+            writer.add_scalar('imp_weight/min_ratio', min_ratio)
+            writer.add_scalar('imp_weight/max_ratio', max_ratio)
+            writer.add_scalar('imp_weight/min_ratio1', min_ratio1)
+            writer.add_scalar('imp_weight/max_ratio1', max_ratio1)
+            writer.add_scalar('imp_weight/min_ratio2', min_ratio2)
+            writer.add_scalar('imp_weight/max_ratio2', max_ratio2)
 
+            writer.add_scalar('losses/ratio_clifracs',  ratio_clipfracs / args.batch_size)
+            writer.add_scalar('losses/ratio1_clifracs',  ratio1_clipfracs / args.batch_size)
+            writer.add_scalar('losses/ratio2_clipfracs',  ratio2_clipfracs / args.batch_size)
+            # writer.add_scalar("losses/act_std", new_std.detach().mean(), batch_index)
 
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
@@ -473,27 +408,6 @@ if __name__ == "__main__":
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-
-        # if args.track:
-        #     logs_ = {
-        #         "time_step": global_step,
-        #         "learning_rate": optimizer.param_groups[0]["lr"],
-        #         "value_loss" : v_loss.item(),
-        #         "policy_loss" : pg_loss.item(),
-        #         "entropy": entropy_loss.item(),
-        #         "old_approx_kl": old_approx_kl.item(),
-        #         "approx_kl": approx_kl.item(),
-        #         "clipfrac" :  np.mean(clipfracs),
-        #         "explained_variance" : explained_var,
-        #         "ratio" : np.mean(ratio.detach().cpu().numpy()),
-        #         "ratio1": np.mean(ratio1.detach().cpu().numpy()),
-        #         "ratio2": np.mean(ratio2.detach().cpu().numpy()),
-        #     }
-        #     logger.info(f"log data is {logs_}")
-        #     wandb.log(logs_)
-
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
-        
         
         
         
@@ -503,38 +417,12 @@ if __name__ == "__main__":
         writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
         # writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
         # writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
-        writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
+        # writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
 
-
-
-        logger.info(f"SPS: {int(global_step / (time.time() - start_time))}")
+        # logger.info(f"SPS: {int(global_step / (time.time() - start_time))}")
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
-    if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-        torch.save(agent.state_dict(), model_path)
-        logger.info(f"model saved to {model_path}")
-        from cleanrl_utils.evals.ppo_eval import evaluate
-
-        episodic_returns = evaluate(
-            model_path,
-            make_env,
-            args.env_id,
-            eval_episodes=10,
-            run_name=f"{run_name}-eval",
-            Model=Agent,
-            device=device,
-            gamma=args.gamma,
-        )
-        for idx, episodic_return in enumerate(episodic_returns):
-            writer.add_scalar("eval/episodic_return", episodic_return, idx)
-
-        if args.upload_model:
-            from cleanrl_utils.huggingface import push_to_hub
-            repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-            repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-            push_to_hub(args, episodic_returns, repo_id, "PPO", f"runs/{run_name}", f"videos/{run_name}-eval")
 
     envs.close()
     writer.close()

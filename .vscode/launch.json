@@ -8,16 +8,16 @@
             "name": "Python Debugger: ppo_mujoco_original",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/cleanrl/ppo_mujoco_original.py",
+            "program": "${workspaceFolder}/src/mujoco/mujuco_main.py",
             "console": "integratedTerminal",
             "args": [
                 "--exp_name", "debugger_test",
                 "--seed", "1",
-                "--env_id", "Humanoid-v4",
+                "--env_id", "HumanoidStandup-v4",
                 "--wandb_project_name", "AnchorPPO-Mujuco-supply",
                 "--track",
                 "--sample_action_num", "1",
-                "--update_epoch", "20"
+                "--update_epoch", "5"
             ],
             "justMyCode": false,
             "env": {

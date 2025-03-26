@@ -31,7 +31,7 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = gym.wrappers.ClipAction(env)
         env = gym.wrappers.NormalizeObservation(env)
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), observation_space = env.observation_space)
         env = gym.wrappers.NormalizeReward(env, gamma=gamma)
         env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
         return env
@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
 
     # env setup
-    envs = gym.vector.SyncVectorEnv(
+    envs = gym.vector.AsyncVectorEnv(
         [make_env(args.env_id, i, args.capture_video, run_name, args.gamma) for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
@@ -191,7 +191,7 @@ if __name__ == "__main__":
             optimizer.param_groups[0]["lr"] = lrnow
 
         # record return
-        total_return = 0.0
+        total_reward = 0.0
         
         for step in range(0, args.num_steps):
             global_step += args.num_envs
@@ -211,19 +211,28 @@ if __name__ == "__main__":
             
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action[:,0,:].cpu().numpy())
+            total_reward += reward.sum()
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(args.device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(args.device), torch.Tensor(next_done).to(args.device)
 
-            if "final_info" in infos:
-                for index, info in enumerate(infos["final_info"]):
-                    if info and "episode" in info:
-                        args.logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
-                        writer.add_scalar("charts/episodic_return", info["episode"]["r"] , global_step)
-                        writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
-                        writer.add_scalar("charts/global_step", global_step)
-                        total_return += info["episode"]["r"]
+            # v4 version
+            # if "final_info" in infos:
+            #     for index, info in enumerate(infos["final_info"]):
+            #         if info and "episode" in info:
+            #             args.logger.info(f"index = {index}, global_step = {global_step}, episodic_return = {info['episode']['r']}")
+            #             writer.add_scalar("charts/episodic_return", info["episode"]["r"] , global_step)
+            #             writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+            #             writer.add_scalar("charts/global_step", global_step)
+            #             total_return += info["episode"]["r"]
 
+            # v5 version
+            if "episode" in infos:
+                episode_return = np.sum(infos["episode"]["r"] * infos["episode"]["_r"]) / args.num_envs
+                episode_length = np.sum(infos["episode"]["l"] * infos["episode"]["_l"]) / args.num_envs
+                args.logger.info(f"global_step = {global_step}, episodic_return = {episode_return}, episodic_length = {episode_length}")
+                writer.add_scalar("charts/episodic_return", episode_return, global_step)
+                writer.add_scalar("charts/episodic_length", episode_length, global_step)
         
         # bootstrap value if not done
         # with torch.no_grad():
@@ -240,7 +249,9 @@ if __name__ == "__main__":
         #         delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
         #         advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
         #     returns = advantages + values
-
+        # args.logger.info(f'reward is {total_reward}')
+        # writer.add_scalar("charts/total_reward", total_reward, global_step)
+        
         returns, advantages = compute_advantages(
             args = args, 
             agent = agent, 
@@ -273,6 +284,7 @@ if __name__ == "__main__":
         clipfracs = []
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
+
             ratio_clipfracs, ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0, 0.0
             min_ratio, max_ratio = 10.0, 0.0
             min_ratio1, max_ratio1 =  10.0, 0.0
@@ -396,7 +408,6 @@ if __name__ == "__main__":
             writer.add_scalar('imp_weight/max_ratio1', max_ratio1)
             writer.add_scalar('imp_weight/min_ratio2', min_ratio2)
             writer.add_scalar('imp_weight/max_ratio2', max_ratio2)
-
             writer.add_scalar('losses/ratio_clifracs',  ratio_clipfracs / args.batch_size)
             writer.add_scalar('losses/ratio1_clifracs',  ratio1_clipfracs / args.batch_size)
             writer.add_scalar('losses/ratio2_clipfracs',  ratio2_clipfracs / args.batch_size)

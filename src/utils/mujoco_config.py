@@ -9,11 +9,11 @@ from prettytable import PrettyTable
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # from loguru import logger
-def get_config():
+def get_mujuco_config():
     parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")
     
     # Experiment arguments
-    parser.add_argument('--exp_name', type=str, default="HalfCheetah-v4",help="The name of this experiment")
+    parser.add_argument('--exp_name', type=str, default="HumanoidStandup-v5",help="The name of this experiment")
     parser.add_argument('--seed', type=int, default=1, help="Seed of the experiment")
     parser.add_argument('--torch_deterministic', type=bool, default=True, 
                         help="If toggled, `torch.backends.cudnn.deterministic=False`")
@@ -28,7 +28,7 @@ def get_config():
     parser.add_argument('--hf_entity', type=str, default="", help="The user or org name of the model repository from the Hugging Face Hub")
 
     # Algorithm specific arguments
-    parser.add_argument('--env_id', type=str, default="HalfCheetah-v4", help="The id of the environment")
+    parser.add_argument('--env_id', type=str, default="HumanoidStandup-v5", help="The id of the environment")
     parser.add_argument('--total_timesteps', type=int, default=1000000, help="Total timesteps of the experiments")
     parser.add_argument('--learning_rate', type=float, default=3e-4, help="The learning rate of the optimizer")
     parser.add_argument('--num_envs', type=int, default=8, help="The number of parallel game environments")

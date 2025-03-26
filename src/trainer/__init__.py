@@ -1,2 +1,3 @@
-from .base_trainer import BaseTranier
-from .mujoco_trainer import MujocoTrainer
+from .base_trainer import *
+from .mujoco_trainer import *
+from .atari_trainer import *

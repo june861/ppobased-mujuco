@@ -11,9 +11,9 @@ import torch.nn as nn
 import time
 import numpy as np
 from utils import compute_kld
-from .base_trainer import BaseTranier
+from .base_trainer import BaseTrainer
 
-class MujocoTrainer(BaseTranier):
+class MujocoTrainer(BaseTrainer):
     def __init__(self, args = None, agent = None, optimizer = None, writer = None):
         super().__init__(args, agent, optimizer, writer)
     
@@ -49,10 +49,11 @@ class MujocoTrainer(BaseTranier):
         ratio1 = logratio1.exp()
         if self.args.sample_action_num > 1:
             ratio2 = torch.sum(total_logratio[:,1:], dim=1).exp()
+            ratio2 = torch.pow(ratio2, 1 / self.args.sample_action_num)
             ratio2 = torch.clamp(ratio2, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
         else:
             ratio2 = torch.ones_like(ratio1).detach()
-            # ratio2 = ratio1.detach()
+
         ratio = ratio1 * ratio2
         dict_ = {
             'ratio' : ratio,
@@ -62,13 +63,7 @@ class MujocoTrainer(BaseTranier):
         
         return dict_
 
-    def log_with_batchindex(self, dict_):
-        for tag, value in dict_.items():
-            self.writer.add_scalar(tag, value, self.batch_index)
-    
-    def log_(self, dict_):
-        for tag, value in dict_.items():
-            self.writer.add_scalar(tag, value)
+
     
     def compute_value_loss(self, mb_returns, mb_values, newvalue):
         # Value loss
@@ -145,7 +140,7 @@ class MujocoTrainer(BaseTranier):
                         "imp_weight/ratio1": np.mean(ratio1.detach().cpu().numpy()),
                         "imp_weight/ratio2": np.mean(ratio2.detach().cpu().numpy()),
                     }
-                    self.log_with_batchindex(mini_dict_)              
+                    self.log_minibatch(mini_dict_)     
 
                 mb_advantages = b_advantages[mb_inds]
                 # if self.args.norm_adv:

@@ -17,7 +17,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import torch.optim as optim
-from utils import compute_advantages, get_mujuco_config
+from utils import compute_advantages, mujoco_conf
 from agent import Agent
 from trainer import MujocoTrainer
 from buffer import MujocoBuffer
@@ -42,18 +42,16 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
     return thunk
 
 def launch_log(args):
-    run_name = f"{args.env_id}__{args.exp_name}__seed{args.seed}_{int(time.time())}_ratio2clamp_grad"
+    run_name = f"{args.exp_name}_{int(time.time())}_{os.getppid()}"
     if args.track:
-        wandb_group = args.wandb_group if args.wandb_group != None else f"{args.env_id}__{args.exp_name}_clipcoef{str(args.clip_coef)}__ratio2clamp_v1_grad"
-        args.logger.info(f"use wandb to log.Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
+        wandb_group = args.exp_name
+        args.logger.info(f"use wandb to log. Project is {args.wandb_project_name}, Group is {wandb_group}, Name is {run_name}")
         wandb.init(
             project=args.wandb_project_name,
             group=wandb_group,
-            # entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
-            # monitor_gym=True,
             save_code=True,
         )
 
@@ -68,7 +66,7 @@ def launch_log(args):
 
 if __name__ == "__main__":
     # args = tyro.cli(Args)
-    args = get_mujuco_config()
+    args = mujoco_conf()
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)

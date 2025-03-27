@@ -24,7 +24,7 @@ class BaseTrainer(object):
     def update(self):
         raise NotImplementedError(f"BaseTranier.update hasn't implemented!")
     
-    def _not_implemented(self):
+    def _not_implemented(self, *args):
         self.args.logger.error(f'Not Implemented for such func')
         raise NotImplementedError
 

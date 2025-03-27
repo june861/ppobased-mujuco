@@ -22,7 +22,7 @@ class AtariTrainer(BaseTrainer):
     def reshape_(self, buffer):
         obs, actions, log_probs, advantages, returns, values, old_logits  = buffer
         # TODO(weijun): 添加observation_shape和discrete_action_space_n到args中
-        b_obs = obs.reshape(-1, self.args.observation_shape)
+        b_obs = obs.reshape((-1, ) + self.args.single_observation_space.shape)
         b_actions = actions.reshape(-1)
         b_log_probs = log_probs.reshape(-1)
         b_returns = returns.reshape(-1)
@@ -48,7 +48,7 @@ class AtariTrainer(BaseTrainer):
             log_ratio2 = log_ratio2.unsqueeze(1)
         raw_ratio2 = torch.sum(log_ratio2, dim=1).exp()
         # raw_ratio2 = torch.pow(raw_ratio2,  1 / num_alter_actions)
-        ratio2 = torch.clamp(raw_ratio2, 1 - self.args.epsilon_2, 1 + self.args.epsilon_2)
+        ratio2 = torch.clamp(raw_ratio2, 1 - self.args.clip_coef_2, 1 + self.args.clip_coef_2)
         ratio = ratio1 * ratio2
         return ratio, ratio1, raw_ratio2
     
@@ -62,8 +62,8 @@ class AtariTrainer(BaseTrainer):
     def map_compute_ratio_func(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
         func_dict = {
             "ppo-clip" : self._ppoclip_compute_ratio_family,
-            "ppo-all" : self._appo_compute_ratio_family,
-            "ppo-two" : self._appo_compute_ratio_family,
+            "appo-all" : self._appo_compute_ratio_family,
+            "appo-two" : self._appo_compute_ratio_family,
         }
 
         func_ = func_dict.get(self.args.algo, self._not_implemented)
@@ -135,7 +135,7 @@ class AtariTrainer(BaseTrainer):
                 pg_loss = self.compute_policy_loss(ratios, mb_advantages)
 
                 # Value loss
-                v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], new_value = new_value, mb_values = b_values[mb_inds])
+                v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], newvalue = new_value, mb_values = b_values[mb_inds])
                 # Policy entropy
                 entropy_loss = new_entropy.mean()
                 # Total loss

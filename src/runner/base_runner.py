@@ -86,15 +86,15 @@ class BaseRunner(ABC):
         return 0
             
 
-    def log_episode(self, infos, global_step):
+    def log_episode(self, infos):
         """Log episodic return and length."""
         for index, info in enumerate(infos["final_info"]):
             if info and "episode" in info:
                 episodic_return = info["episode"]["r"]
                 episodic_length = info["episode"]["l"]
-                self.writer.add_scalar("charts/episodic_return", episodic_return, global_step)
-                self.writer.add_scalar("charts/episodic_length", episodic_length, global_step)
-                self.all_args.logger.info(f"Step {global_step}: episodic_return = {episodic_return}, episodic_length = {episodic_length}")
+                self.writer.add_scalar("charts/episodic_return", episodic_return, self.global_step)
+                self.writer.add_scalar("charts/episodic_length", episodic_length, self.global_step)
+                self.all_args.logger.info(f"Step {self.global_step}: episodic_return = {episodic_return}, episodic_length = {episodic_length}")
     
     def collect_rollout(self):
         raise NotImplementedError

@@ -23,6 +23,7 @@ algorithm:
   update_epochs: 4  # The number of epochs for policy updates
   norm_adv: true  # Whether to normalize advantages
   clip_coef: !!float 0.1  # The clipping coefficient for the surrogate objective
+  clip_coef_2: !!float 0.1  # The clipping coefficient for the ratio2
   clip_vloss: true  # Whether to use a clipped loss for the value function
   ent_coef: !!float 0.01  # The entropy coefficient
   vf_coef: !!float 0.5  # The value function coefficient

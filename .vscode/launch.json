@@ -5,38 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: ppo_mujoco_original",
+            "name": "Python Debugger: mujoco",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/algos/mujoco/run.py",
             "console": "integratedTerminal",
             "args": [
-                // "--exp_name", "debugger_test",
                 "--seed", "1",
                 "--env_id", "HumanoidStandup-v4",
-                // "--wandb_project_name", "AnchorPPO-Mujuco-supply",
-                // "--track",
-                // "--sample_action_num", "5",
-                // "--update_epoch", "5"
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
             ],
             "justMyCode": true,
         },
 
         {
-            "name": "Debug Mujoco with -m",
+            "name": "Python Debugger: atari",
             "type": "debugpy",
             "request": "launch",
-            "module": "algos.mujoco.run",
+            "program": "${workspaceFolder}/src/algos/atari/run.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
             "args": [
+                "--env_type", "atari",
                 "--seed", "1",
-                "--env_id", "HumanoidStandup-v4",
-                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
+                "--env_id", "AssaultNoFrameskip-v4",
+                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
+                "--algo", "ppo-clip",
             ],
         }
     ]

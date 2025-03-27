@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
 
     envs = gym.vector.SyncVectorEnv(
-        [runner.make_env(i, runner.run_name) for i in range(runner.all_args.num_envs)]
+        [runner.make_envs(i, runner.run_name) for i in range(runner.all_args.num_envs)]
     )
     if not isinstance(envs.single_action_space, gym.spaces.Box):
         runner.all_args.logger.error(f"only continuous action space is supported")

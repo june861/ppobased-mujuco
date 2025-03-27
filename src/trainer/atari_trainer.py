@@ -147,6 +147,12 @@ class AtariTrainer(BaseTrainer):
                     old_approx_kl = (-logratio1).mean()
                     approx_kl = ((ratio1 - 1) - logratio1).mean()
 
+                    # 计算KL
+                    kl_divs = torch.distributions.kl.kl_divergence(
+                        Categorical(logits=b_old_logits[mb_inds]), 
+                        Categorical(logits=new_logits),
+                    ).mean()
+                    
                     # ratios family
                     min_ratio, max_ratio = min(np.min(ratios.detach().cpu().numpy()), min_ratio), max(np.max(ratios.detach().cpu().numpy()), max_ratio)
                     min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
@@ -160,21 +166,10 @@ class AtariTrainer(BaseTrainer):
                         "imp_weight/ratio": np.mean(ratios.detach().cpu().numpy()),
                         "imp_weight/ratio1": np.mean(ratio1.detach().cpu().numpy()),
                         "imp_weight/ratio2": np.mean(ratio2.detach().cpu().numpy()),
+                        "losses/kl_div" : kl_divs,
                     }
                     self.log_minibatch(mini_dict_) 
-                
-                min_ratio, max_ratio = np.min(ratios.detach().cpu().numpy()), np.max(ratios.detach().cpu().numpy())
-                min_ratio1, max_ratio1 = np.min(ratio1.detach().cpu().numpy()), np.max(ratio1.detach().cpu().numpy())
-                min_ratio2, max_ratio2 = np.min(ratio2.detach().cpu().numpy()), np.max(ratio2.detach().cpu().numpy())
-                
-                if start == 0 and epoch !=0 :
-                    # 计算KL
-                    kl_divs = torch.distributions.kl.kl_divergence(
-                        Categorical(logits=b_old_logits[mb_inds]), 
-                        Categorical(logits=new_logits),
-                    ).mean()
-                    self.writer.add_scalar('losses/kl_div', kl_divs.item())
-                
+
                 # param update
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -194,9 +189,7 @@ class AtariTrainer(BaseTrainer):
                 'losses/ratio1_clifracs' :  ratio1_clipfracs / self.args.batch_size,
                 'losses/ratio2_clipfracs' :  ratio2_clipfracs / self.args.batch_size,
             }
-            
             self.log_(dict_)
-        
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
@@ -209,6 +202,5 @@ class AtariTrainer(BaseTrainer):
             "losses/explained_variance": explained_var,
             "charts/SPS": int(global_step / (time.time() - self.start_time)),
         }
-        
         self.log_(dict_)
 

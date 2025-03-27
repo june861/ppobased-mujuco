@@ -1,7 +1,0 @@
-# @package _global_
-# The above @package _global_ is a necessary tag read by Hydra.
-
-# Override defaults for env & algo combination. E.g.,
-
-optim:
-  minibatch_size: 256

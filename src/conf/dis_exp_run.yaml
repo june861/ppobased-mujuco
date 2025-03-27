@@ -12,7 +12,6 @@ experiment:
 # ⚡️ Algorithm Specific Arguments
 # ===========================
 algorithm:
-  env_id: "BreakoutNoFrameskip-v4"  # The environment ID
   total_timesteps: 10000000  # The total number of timesteps for the experiment
   learning_rate: !!float 2.5e-4  # The learning rate for the optimizer
   num_envs: 8  # The number of parallel game environments
@@ -30,4 +29,7 @@ algorithm:
   max_grad_norm: !!float 0.5  # The maximum norm for gradient clipping
   target_kl: null  # The target KL divergence threshold
 
-
+# ===========================
+# 🕹️ Runtime Configuration
+# ===========================
+  noise_exp: False

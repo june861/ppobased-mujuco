@@ -14,7 +14,7 @@ from utils import layer_init
 
 class Agent(nn.Module):
     # DONE(junweiluo)：增加一个离散化动作的参数
-    def __init__(self, envs, sample_action_num = 1, max_scale = 1.0):
+    def __init__(self, envs, sample_action_num = 1):
         super().__init__()
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
@@ -34,7 +34,6 @@ class Agent(nn.Module):
 
         # junweiluo: 增加参数，
         self.sample_action_num = sample_action_num 
-        self.scale = max_scale
     
     # junweiluo: 增加函数
     def sample_action(self, probs):

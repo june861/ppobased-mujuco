@@ -1,5 +1,5 @@
 # ===========================
-# 🌟 Experiment Configuration
+# 🌟 Experiment Configuration In Continous Action Space
 # ===========================
 experiment:
   # Whether to use deterministic behavior in torch (ensures consistency in results)
@@ -68,8 +68,8 @@ runtime:
 # 🎲 Action Sample Configuration
 # ===========================
 action_sample:
-  # Number of actions to sample per step
-  sample_action_num: 2
+  # Number of actions to sample per step, different param between APPO and PPO-Clip
+  sample_action_num: 1
   # ratio2 require grad
   # require_grad: True
 

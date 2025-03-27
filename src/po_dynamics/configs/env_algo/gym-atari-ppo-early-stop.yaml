@@ -1,5 +1,0 @@
-# @package _global_
-
-defaults:
-  - gym-atari-ppo
-  - _self_

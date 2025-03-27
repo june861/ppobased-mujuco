@@ -8,30 +8,36 @@
             "name": "Python Debugger: ppo_mujoco_original",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/mujoco/mujuco_main.py",
+            "program": "${workspaceFolder}/src/algos/mujoco/run.py",
             "console": "integratedTerminal",
             "args": [
                 // "--exp_name", "debugger_test",
-                // "--seed", "1",
-                // "--env_id", "HumanoidStandup-v4",
+                "--seed", "1",
+                "--env_id", "HumanoidStandup-v4",
                 // "--wandb_project_name", "AnchorPPO-Mujuco-supply",
                 // "--track",
                 // "--sample_action_num", "5",
                 // "--update_epoch", "5"
-                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/mujuco_run.yaml",
+                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
             ],
             "justMyCode": true,
         },
-    
-
 
         {
-            "name": "Python Debugger: get obs",
+            "name": "Debug Mujoco with -m",
             "type": "debugpy",
             "request": "launch",
-            "program": "/project/no-representation-no-trust/src/scripts/for_obs.py",
+            "module": "algos.mujoco.run",
             "console": "integratedTerminal",
-            "justMyCode": false,
-        },
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "--seed", "1",
+                "--env_id", "HumanoidStandup-v4",
+                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
+            ],
+        }
     ]
 }

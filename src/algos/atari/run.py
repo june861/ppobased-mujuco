@@ -11,16 +11,10 @@
 import os
 import sys
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
-import random
-import time
-import wandb
 import gymnasium as gym
-import numpy as np
-import torch
-import torch.nn as nn
 import torch.optim as optim
 from utils import get_conf
-from agent import Agent
+from .agent import Agent
 from trainer import AtariTrainer
 from buffer import AtariBuffer
 from runner import AtariRunner
@@ -36,8 +30,6 @@ if __name__ == "__main__":
     }
     
     runner = AtariRunner(config_)
-
-
     envs = gym.vector.SyncVectorEnv(
         [runner.make_envs(i) for i in range(runner.all_args.num_envs)]
     )

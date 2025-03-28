@@ -13,7 +13,7 @@ import gymnasium as gym
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 import torch.optim as optim
 from utils import get_conf
-from agent import Agent
+from .agent import Agent
 from trainer import MujocoTrainer
 from buffer import MujocoBuffer
 from runner import MujocoRunner

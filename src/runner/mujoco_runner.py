@@ -84,4 +84,4 @@ class MujocoRunner(BaseRunner):
             self.next_obs, self.next_done = torch.Tensor(self.next_obs).to(self.all_args.device), torch.Tensor(self.next_done).to(self.all_args.device)
             
             if "final_info" in infos:
-                self.log_episode(infos, self.global_step)
+                self.log_episode(infos)

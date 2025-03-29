@@ -32,7 +32,7 @@ class Agent(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             layer_init(nn.Linear(64 * 7 * 7, 512)),
-            # nn.LayerNorm(512),
+            nn.LayerNorm(512),
             nn.ReLU(),
             
         )

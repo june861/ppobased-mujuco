@@ -11,8 +11,8 @@ import os
 import time
 import torch
 import numpy as np
-import gymnasium as gym
-from abc import ABC, abstractmethod
+from abc import ABC
+
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 
@@ -94,7 +94,7 @@ class BaseRunner(ABC):
                 episodic_length = info["episode"]["l"]
                 self.writer.add_scalar("charts/episodic_return", episodic_return, self.global_step)
                 self.writer.add_scalar("charts/episodic_length", episodic_length, self.global_step)
-                self.all_args.logger.info(f"Step {self.global_step}: episodic_return = {episodic_return}, episodic_length = {episodic_length}")
+                # self.all_args.logger.info(f"Step {self.global_step}: episodic_return = {episodic_return}, episodic_length = {episodic_length}")
     
     def collect_rollout(self):
         raise NotImplementedError

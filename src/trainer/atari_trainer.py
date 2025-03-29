@@ -12,7 +12,7 @@ import torch.nn as nn
 import numpy as np
 from torch.distributions import Categorical
 from .base_trainer import BaseTrainer
-
+from tqdm import trange
 
 class AtariTrainer(BaseTrainer):
     def __init__(self, args=None, agent=None, optimizer=None, writer=None):
@@ -46,11 +46,12 @@ class AtariTrainer(BaseTrainer):
         log_ratio2 = new_logprobs - old_logprobs
         if len(log_ratio2.shape) == 1:
             log_ratio2 = log_ratio2.unsqueeze(1)
-        raw_ratio2 = torch.sum(log_ratio2, dim=1).exp()
+        raw_ratio2 = log_ratio2.exp()
+        ratio2 = torch.sum(raw_ratio2, dim = 1) / self.num_alter_logprobs
         # raw_ratio2 = torch.pow(raw_ratio2,  1 / num_alter_actions)
-        ratio2 = torch.clamp(raw_ratio2, 1 - self.args.clip_coef_2, 1 + self.args.clip_coef_2)
-        ratio = ratio1 * ratio2
-        return ratio, ratio1, raw_ratio2
+        # ratio2 = torch.clamp(raw_ratio2, 1 - self.args.clip_coef_2, 1 + self.args.clip_coef_2)
+        ratio = ratio1
+        return ratio, ratio1, ratio2
     
     def _ppoclip_compute_ratio_family(self, new_log_prob, mb_log_probs, *args):
         log_ratio1 = new_log_prob - mb_log_probs
@@ -87,12 +88,13 @@ class AtariTrainer(BaseTrainer):
 
         return v_loss
     
-    def compute_policy_loss(self, ratio, mb_advantages):
+    def compute_policy_loss(self, ratio, mb_advantages, ratio2):
         # Policy loss
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
-        pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
+        # pg_loss1 = -mb_advantages * ratio
+        # pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
+        # pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+        
+        pg_loss = - (mb_advantages * ratio - 0.5 * (ratio2 - 1)**2 ).mean()
         return pg_loss
     
         
@@ -132,7 +134,7 @@ class AtariTrainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
-                pg_loss = self.compute_policy_loss(ratios, mb_advantages)
+                pg_loss = self.compute_policy_loss(ratios, mb_advantages, ratio2)
 
                 # Value loss
                 v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], newvalue = new_value, mb_values = b_values[mb_inds])

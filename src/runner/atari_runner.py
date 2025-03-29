@@ -12,6 +12,7 @@ import numpy as np
 import gymnasium as gym
 from .base_runner import BaseRunner
 from utils import compute_advantages
+from tqdm import trange
 from stable_baselines3.common.atari_wrappers import (  # isort:skip
     ClipRewardEnv,
     EpisodicLifeEnv,
@@ -49,7 +50,7 @@ class AtariRunner(BaseRunner):
         return thunk
 
     def run(self):
-        for iteration in range(1, self.all_args.num_iterations + 1):
+        for iteration in trange(1, self.all_args.num_iterations + 1):
             # Annealing the rate if instructed to do so.
             if self.all_args.anneal_lr:
                 frac = 1.0 - (iteration - 1.0) / self.all_args.num_iterations

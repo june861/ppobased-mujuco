@@ -29,7 +29,7 @@
                 "--seed", "1",
                 "--env_id", "AssaultNoFrameskip-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
-                "--algo", "ppo-clip",
+                "--algo", "appo-all",
             ],
         }
     ]

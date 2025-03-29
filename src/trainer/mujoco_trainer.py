@@ -84,11 +84,31 @@ class MujocoTrainer(BaseTrainer):
         
         return v_loss
 
-    def compute_policy_loss(self, mb_advantages, ratio):
+    def compute_policy_loss(self, mb_advantages, ratio, ratio2):
+
+        
         # Policy loss
+        # pg_loss1 = -mb_advantages * ratio
+        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        # pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+
+        # Policy loss
+        # pg_loss1 = -mb_advantages * ratio
+        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        # pg_loss = - (mb_advantages * ratio + 0.5 * torch.abs(mb_advantages) * (ratio2 - 1)**2 ).mean()        
+
         pg_loss1 = -mb_advantages * ratio
         pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+        pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean() * self.args.decay_beta
+
+        
+        ratio2_norm = ratio2 / ratio2.mean()
+        pg_loss_2 = 0.5 * torch.abs(mb_advantages.detach()) * (ratio2_norm - 1)**2 * self.args.decay_beta
+
+        pg_loss = pg_loss_1 + pg_loss_2.mean()
+        
+        self.writer.add_scalar("losses/pg_loss_1", pg_loss_1.mean().item(), self.batch_index)
+        self.writer.add_scalar("losses/pg_loss_2", pg_loss_2.mean().item(), self.batch_index)
         
         return pg_loss
     
@@ -147,7 +167,7 @@ class MujocoTrainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
-                pg_loss = self.compute_policy_loss(mb_advantages = mb_advantages, ratio = ratio)
+                pg_loss = self.compute_policy_loss(mb_advantages = mb_advantages, ratio = ratio, ratio2 = ratio2)
                 # value loss
                 v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], mb_values = b_values[mb_inds], newvalue = newvalue)
                 # entropy loss

@@ -34,3 +34,4 @@ algorithm:
 # 🕹️ Runtime Configuration
 # ===========================
   noise_exp: False
+  sample_action_num: 2

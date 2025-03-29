@@ -16,103 +16,7 @@ from .base_trainer import BaseTrainer
 class MujocoTrainer(BaseTrainer):
     def __init__(self, args = None, agent = None, optimizer = None, writer = None):
         super().__init__(args, agent, optimizer, writer)
-    
-    
-    def reshape_(self, buffer):
-        
-        obs, logprobs, actions, advantages, returns, values, means, stds = buffer
-        # flatten the batch
-        b_obs = obs.reshape((-1,) + self.args.single_observation_space.shape)
-        # b_logprobs shape is (args.num_steps * args.num_envs, args.sample_action_num)
-        b_logprobs = logprobs.reshape((-1,) + (self.args.sample_action_num,))
-        # b_actions shape is (args.num_steps * args.num_envs, args.sample_action_num, action_dim)
-        b_actions = actions.reshape((-1,) + (self.args.sample_action_num,) + self.args.single_action_space.shape)
-        b_advantages = advantages.reshape(-1)
-        b_returns = returns.reshape(-1)
-        b_values = values.reshape(-1)
-        b_means = means.reshape(self.args.batch_size, -1)
-        b_stds = stds.reshape(self.args.batch_size, -1)
-        
-        return b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds
-    
-    
-    def compute_ratios_cluster(self, newlogprob, mb_logprobs):
-        """ return ratios cluster
 
-        Args:
-            newlogprob (_type_): _description_
-            mb_logprobs (_type_): _description_
-        """
-
-        total_logratio = newlogprob - mb_logprobs
-        logratio1 = total_logratio[:,0]
-        ratio1 = logratio1.exp()
-        if self.args.sample_action_num > 1:
-            ratio2 = torch.sum(total_logratio[:,1:], dim=1).exp()
-            ratio2 = torch.pow(ratio2, 1 / self.args.sample_action_num)
-            ratio2 = torch.clamp(ratio2, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
-        else:
-            ratio2 = torch.ones_like(ratio1).detach()
-
-        ratio = ratio1 * ratio2
-        dict_ = {
-            'ratio' : ratio,
-            'ratio1' : ratio1,
-            'ratio2': ratio2,
-        }
-        
-        return dict_
-
-
-    
-    def compute_value_loss(self, mb_returns, mb_values, newvalue):
-        # Value loss
-        newvalue = newvalue.view(-1)
-        # if self.args.clip_vloss:
-        v_loss_unclipped = (newvalue - mb_returns) ** 2
-        v_clipped = mb_values + torch.clamp(
-            newvalue - mb_values,
-            -self.args.clip_coef,
-            self.args.clip_coef,
-        )
-        v_loss_clipped = (v_clipped - mb_returns) ** 2
-        v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-        v_loss = 0.5 * v_loss_max.mean()
-        
-        # else:
-        #     v_loss = 0.5 * ((newvalue -mb_returns) ** 2).mean()
-        
-        return v_loss
-
-    def compute_policy_loss(self, mb_advantages, ratio, ratio2):
-
-        
-        # Policy loss
-        # pg_loss1 = -mb_advantages * ratio
-        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        # pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
-        # Policy loss
-        # pg_loss1 = -mb_advantages * ratio
-        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        # pg_loss = - (mb_advantages * ratio + 0.5 * torch.abs(mb_advantages) * (ratio2 - 1)**2 ).mean()        
-
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean() * self.args.decay_beta
-
-        
-        ratio2_norm = ratio2 / ratio2.mean()
-        pg_loss_2 = 0.5 * torch.abs(mb_advantages.detach()) * (ratio2_norm - 1)**2 * self.args.decay_beta
-
-        pg_loss = pg_loss_1 + pg_loss_2.mean()
-        
-        self.writer.add_scalar("losses/pg_loss_1", pg_loss_1.mean().item(), self.batch_index)
-        self.writer.add_scalar("losses/pg_loss_2", pg_loss_2.mean().item(), self.batch_index)
-        
-        return pg_loss
-    
-    
     def train(self, buffer, global_step):
         
         b_inds = np.arange(self.args.batch_size)
@@ -215,3 +119,94 @@ class MujocoTrainer(BaseTrainer):
         
         self.log_(dict_)
         
+    
+    def reshape_(self, buffer):
+        obs, logprobs, actions, advantages, returns, values, means, stds = buffer
+        # flatten the batch
+        b_obs = obs.reshape((-1,) + self.args.single_observation_space.shape)
+        # b_logprobs shape is (args.num_steps * args.num_envs, args.sample_action_num)
+        b_logprobs = logprobs.reshape((-1,) + (self.args.sample_action_num,))
+        # b_actions shape is (args.num_steps * args.num_envs, args.sample_action_num, action_dim)
+        b_actions = actions.reshape((-1,) + (self.args.sample_action_num,) + self.args.single_action_space.shape)
+        b_advantages = advantages.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_values = values.reshape(-1)
+        b_means = means.reshape(self.args.batch_size, -1)
+        b_stds = stds.reshape(self.args.batch_size, -1)
+        
+        return b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds
+    
+    
+    def compute_ratios_family(self, newlogprob, mb_logprobs):
+        """ return ratios family
+
+        Args:
+            newlogprob (_type_): _description_
+            mb_logprobs (_type_): _description_
+        """
+
+        total_logratio = newlogprob - mb_logprobs
+        logratio1 = total_logratio[:,0]
+        ratio1 = logratio1.exp()
+        if self.args.sample_action_num > 1:
+            ratio2 = torch.sum(total_logratio[:,1:], dim=1).exp()
+            ratio2 = torch.pow(ratio2, 1 / self.args.sample_action_num)
+            ratio2 = torch.clamp(ratio2, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
+        else:
+            ratio2 = torch.ones_like(ratio1).detach()
+
+        ratio = ratio1 * ratio2
+        dict_ = {
+            'ratio' : ratio,
+            'ratio1' : ratio1,
+            'ratio2': ratio2,
+        }
+        
+        return dict_
+
+
+    
+    def compute_value_loss(self, mb_returns, mb_values, newvalue):
+        # Value loss
+        newvalue = newvalue.view(-1)
+        # if self.args.clip_vloss:
+        v_loss_unclipped = (newvalue - mb_returns) ** 2
+        v_clipped = mb_values + torch.clamp(
+            newvalue - mb_values,
+            -self.args.clip_coef,
+            self.args.clip_coef,
+        )
+        v_loss_clipped = (v_clipped - mb_returns) ** 2
+        v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
+        v_loss = 0.5 * v_loss_max.mean()
+        
+        # else:
+        #     v_loss = 0.5 * ((newvalue -mb_returns) ** 2).mean()
+        
+        return v_loss
+
+    def compute_policy_loss(self, mb_advantages, ratio, ratio2):
+
+        
+        # Policy loss
+        # pg_loss1 = -mb_advantages * ratio
+        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        # pg_loss = torch.max(pg_loss1, pg_loss2).mean()     
+
+        pg_loss1 = -mb_advantages * ratio
+        pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean() * self.args.decay_beta
+
+        
+        ratio2_norm = ratio2 / ratio2.mean()
+        pg_loss_2 = 0.5 * torch.abs(mb_advantages.detach()) * (ratio2_norm - 1)**2 * self.args.decay_beta
+
+        pg_loss = pg_loss_1 + pg_loss_2.mean()
+        
+        self.writer.add_scalar("losses/pg_loss_1", pg_loss_1.mean().item(), self.batch_index)
+        self.writer.add_scalar("losses/pg_loss_2", pg_loss_2.mean().item(), self.batch_index)
+        
+        return pg_loss
+    
+    
+

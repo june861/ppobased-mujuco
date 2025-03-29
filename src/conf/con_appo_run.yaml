@@ -53,16 +53,6 @@ algorithm:
   # Target KL divergence threshold; if exceeded, training stops early
   target_kl: null  # YAML does not support None, hence use 0.0
 
-# ===========================
-# 🕹️ Runtime Configuration
-# ===========================
-runtime:
-  # Batch size, computed dynamically during runtime
-  batch_size: 0
-  # Mini-batch size, computed dynamically during runtime
-  minibatch_size: 0
-  # Number of training iterations, computed dynamically during runtime
-  num_iterations: 0
 
 # ===========================
 # 🎲 Action Sample Configuration

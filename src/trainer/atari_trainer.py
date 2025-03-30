@@ -17,7 +17,7 @@ from tqdm import trange
 class AtariTrainer(BaseTrainer):
     def __init__(self, args=None, agent=None, optimizer=None, writer=None):
         super().__init__(args, agent, optimizer, writer)
-        self.num_alter_logprobs = self.args.discrete_action_space_n - 1 if self.args.algo == 'appo-all' else 1
+        self.num_alter_logprobs = self.args.sample_action_num
         
     def reshape_(self, buffer):
         obs, actions, log_probs, advantages, returns, values, old_logits  = buffer
@@ -63,8 +63,7 @@ class AtariTrainer(BaseTrainer):
     def map_compute_ratio_func(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
         func_dict = {
             "ppo-clip" : self._ppoclip_compute_ratio_family,
-            "appo-all" : self._appo_compute_ratio_family,
-            "appo-two" : self._appo_compute_ratio_family,
+            "appo" : self._appo_compute_ratio_family,
         }
 
         func_ = func_dict.get(self.args.algo, self._not_implemented)

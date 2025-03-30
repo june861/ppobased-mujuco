@@ -36,8 +36,8 @@ class MujocoTrainer(BaseTrainer):
         return b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds
     
     
-    def compute_ratios_cluster(self, newlogprob, mb_logprobs):
-        """ return ratios cluster
+    def compute_ratios_family(self, newlogprob, mb_logprobs):
+        """ return ratios family
 
         Args:
             newlogprob (_type_): _description_
@@ -47,24 +47,12 @@ class MujocoTrainer(BaseTrainer):
         total_logratio = newlogprob - mb_logprobs
         logratio1 = total_logratio[:,0]
         ratio1 = logratio1.exp()
-        if self.args.sample_action_num > 1:
-            ratio2 = torch.sum(total_logratio[:,1:], dim=1).exp()
-            ratio2 = torch.pow(ratio2, 1 / self.args.sample_action_num)
-            ratio2 = torch.clamp(ratio2, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
-        else:
-            ratio2 = torch.ones_like(ratio1).detach()
 
-        ratio = ratio1 * ratio2
-        dict_ = {
-            'ratio' : ratio,
-            'ratio1' : ratio1,
-            'ratio2': ratio2,
-        }
-        
-        return dict_
+        logratio2 = total_logratio[:,1:]
+        ratio2 = torch.sum(logratio2, dim=1).exp()
+        ratio2 = ratio2 / (self.args.sample_action_num - 1)
+        return ratio1, ratio2
 
-
-    
     def compute_value_loss(self, mb_returns, mb_values, newvalue):
         # Value loss
         newvalue = newvalue.view(-1)
@@ -84,33 +72,35 @@ class MujocoTrainer(BaseTrainer):
         
         return v_loss
 
-    def compute_policy_loss(self, mb_advantages, ratio, ratio2):
 
-        
-        # Policy loss
-        # pg_loss1 = -mb_advantages * ratio
-        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        # pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+    def compute_policy_loss(self, mb_advantages, ratio1, ratio2):  
+        if self.args.algo == "ppo-clip":
+            pg_loss1 = -mb_advantages * ratio1
+            pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+            pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
-        # Policy loss
-        # pg_loss1 = -mb_advantages * ratio
-        # pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        # pg_loss = - (mb_advantages * ratio + 0.5 * torch.abs(mb_advantages) * (ratio2 - 1)**2 ).mean()        
+            return pg_loss, pg_loss.item(), 0.0
 
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * torch.clamp(ratio, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
-        pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean() * self.args.decay_beta
+        if self.args.algo == "appo":
+            pg_loss1 = -mb_advantages * ratio1
+            pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+            pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
 
-        
-        ratio2_norm = ratio2 / ratio2.mean()
-        pg_loss_2 = 0.5 * torch.abs(mb_advantages.detach()) * (ratio2_norm - 1)**2 * self.args.decay_beta
+            
+            # ratio2_norm = ratio2 / ratio2.mean()
+            # ratio2_ = torch.clamp(ratio2, 0, 1 + self.args.clip_coef)
 
-        pg_loss = pg_loss_1 + pg_loss_2.mean()
-        
-        self.writer.add_scalar("losses/pg_loss_1", pg_loss_1.mean().item(), self.batch_index)
-        self.writer.add_scalar("losses/pg_loss_2", pg_loss_2.mean().item(), self.batch_index)
-        
-        return pg_loss
+            ratio2_ = torch.clamp(ratio2, 0, 1 + self.args.clip_coef)
+            log_ratio2 = ratio2_.log()
+            pg_loss_2 = 0.5 * torch.abs(mb_advantages.detach()) * (log_ratio2**2)
+            pg_loss = pg_loss_1 + pg_loss_2.mean()
+            
+            return pg_loss, pg_loss_1.item(), pg_loss_2.item()
+
+        if self.args.algo == "ppo-kl":
+            self._not_implemented()
+
+        self._not_implemented()
     
     
     def train(self, buffer, global_step):
@@ -122,7 +112,7 @@ class MujocoTrainer(BaseTrainer):
         for epoch in range(self.args.update_epochs):
             np.random.shuffle(b_inds)
             ratio_clipfracs, ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0, 0.0
-            min_ratio, max_ratio = 10.0, 0.0
+            # min_ratio, max_ratio = 10.0, 0.0
             min_ratio1, max_ratio1 =  10.0, 0.0
             min_ratio2, max_ratio2 = 10.0, 0.0
 
@@ -133,12 +123,12 @@ class MujocoTrainer(BaseTrainer):
 
                 _, newlogprob, entropy, newvalue, new_mean_std = self.agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
 
-                ratio_family = self.compute_ratios_cluster(newlogprob, b_logprobs[mb_inds])
-                ratio, ratio1, ratio2 =  ratio_family['ratio'], ratio_family['ratio1'], ratio_family['ratio2']
-                logratio1 = ratio1.log()
+                ratio1, ratio2 = self.compute_ratios_family(newlogprob, b_logprobs[mb_inds])
+                
 
                 with torch.no_grad():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
+                    logratio1 = ratio1.log().detach()
                     old_approx_kl = (-logratio1).mean()
                     approx_kl = ((ratio1 - 1) - logratio1).mean()
                     # use mean and std to calculate kl
@@ -146,17 +136,17 @@ class MujocoTrainer(BaseTrainer):
                     new_std = new_mean_std.scale
                     kl = compute_kld(b_means[mb_inds], b_stds[mb_inds], new_mean, new_std)
                     # ratios family
-                    min_ratio, max_ratio = min(np.min(ratio.detach().cpu().numpy()), min_ratio), max(np.max(ratio.detach().cpu().numpy()), max_ratio)
+                    # min_ratio, max_ratio = min(np.min(ratio.detach().cpu().numpy()), min_ratio), max(np.max(ratio.detach().cpu().numpy()), max_ratio)
                     min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
                     min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
-                    ratio_clipfracs += (torch.abs(ratio.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
+                    # ratio_clipfracs += (torch.abs(ratio.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
                     ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
                     ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()                    
                     mini_dict_ = {
                         "losses/old_approx_kl": old_approx_kl.item(),
                         "losses/approx_kl": approx_kl.item(),
                         "losses/kl": kl.mean().detach().cpu().item() ,
-                        "imp_weight/ratio": np.mean(ratio.detach().cpu().numpy()),
+                        # "imp_weight/ratio": np.mean(ratio.detach().cpu().numpy()),
                         "imp_weight/ratio1": np.mean(ratio1.detach().cpu().numpy()),
                         "imp_weight/ratio2": np.mean(ratio2.detach().cpu().numpy()),
                     }
@@ -167,7 +157,7 @@ class MujocoTrainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
-                pg_loss = self.compute_policy_loss(mb_advantages = mb_advantages, ratio = ratio, ratio2 = ratio2)
+                pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, ratio2 = ratio2)
                 # value loss
                 v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], mb_values = b_values[mb_inds], newvalue = newvalue)
                 # entropy loss
@@ -182,9 +172,8 @@ class MujocoTrainer(BaseTrainer):
                 self.batch_index += 1
 
             dict_ = {
-                "losses/grad_norm" : grad,    
-                'imp_weight/min_ratio' : min_ratio,
-                'imp_weight/max_ratio' : max_ratio,
+                # 'imp_weight/min_ratio' : min_ratio,
+                # 'imp_weight/max_ratio' : max_ratio,
                 'imp_weight/min_ratio1' : min_ratio1,
                 'imp_weight/max_ratio1' : max_ratio1,
                 'imp_weight/min_ratio2' : min_ratio2,
@@ -209,6 +198,9 @@ class MujocoTrainer(BaseTrainer):
             "losses/value_loss": v_loss.item(),
             "losses/policy_loss": pg_loss.item(),
             "losses/entropy": entropy_loss.item(),
+            "losses/grad_norm" : grad, 
+            "losses/pg_loss_1": pg_loss_1,
+            "losses/pg_loss_2": pg_loss_2,
             "losses/explained_variance": explained_var,
             "charts/SPS": int(global_step / (time.time() - start_time)),
         }

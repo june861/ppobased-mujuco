@@ -13,16 +13,10 @@ import gymnasium as gym
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 import torch.optim as optim
 from utils import get_conf
-from buffer import MujocoBuffer
-from runner import MujocoRunner
 
-def launch_task():
-    pass
 
 if __name__ == "__main__":
-    # args = tyro.cli(Args)
     args = get_conf()
-    
     config_ = {
         "all_args" : args,
         "trainer": None,
@@ -72,7 +66,7 @@ if __name__ == "__main__":
         runner.all_args.single_observation_space = envs.single_observation_space
         runner.all_args.single_action_space = envs.single_action_space
         runner.envs = envs
-        agent = Network(runner.envs, sample_action_num = args.sample_action_num).to(args.device))
+        agent = Network(runner.envs, sample_action_num = args.sample_action_num).to(args.device)
     
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
     trainer = Trainer(args, agent, optimizer)

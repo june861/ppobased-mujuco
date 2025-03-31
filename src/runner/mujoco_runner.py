@@ -36,6 +36,30 @@ class MujocoRunner(BaseRunner):
 
         return thunk
 
+    def reshape_(self, data):
+        """ reshape tensor
+
+        Args:
+            data (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        obs, logprobs, actions, advantages, returns, values, means, stds = data
+        # flatten the batch
+        b_obs = obs.reshape((-1,) + self.all_args.single_observation_space.shape)
+        # b_logprobs shape is (args.num_steps * args.num_envs, args.sample_action_num)
+        b_logprobs = logprobs.reshape((-1,) + (self.all_args.sample_action_num,))
+        # b_actions shape is (args.num_steps * args.num_envs, args.sample_action_num, action_dim)
+        b_actions = actions.reshape((-1,) + (self.all_args.sample_action_num,) + self.all_args.single_action_space.shape)
+        b_advantages = advantages.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_values = values.reshape(-1)
+        b_means = means.reshape(self.all_args.batch_size, -1)
+        b_stds = stds.reshape(self.all_args.batch_size, -1)
+        
+        return b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds
+
     def run(self):
         """ Main training loop."""
         for iteration in trange(1, self.all_args.num_iterations + 1):
@@ -48,7 +72,6 @@ class MujocoRunner(BaseRunner):
             self.collect_rollout()
 
             obs, actions, logprobs, rewards, dones, values, means, stds = self.buffer.pop()
-
             returns, advantages = compute_advantages(
                 args = self.all_args, 
                 agent = self.trainer.agent, 
@@ -58,12 +81,11 @@ class MujocoRunner(BaseRunner):
                 next_done = self.next_done, 
                 dones = dones,
             )
-
-            buffer_ = (
-                obs, logprobs, actions, advantages, returns, values, means, stds
-            )
             
-            for dict_ in self.trainer.update_one_episode(buffer_):
+            data = (obs, logprobs, actions, advantages, returns, values, means, stds)
+            data = self.reshape_(data)
+            
+            for dict_ in self.trainer.update_one_episode(data):
                 for k, v in dict_.items():
                     self.writer.add_scalar(k, v)
             

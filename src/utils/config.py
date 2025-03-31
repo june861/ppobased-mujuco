@@ -11,7 +11,7 @@ import os
 import torch
 import time
 import yaml
-from base import getLogger
+from .mylogging import getLogger
 from prettytable import PrettyTable
 
 
@@ -20,7 +20,7 @@ def add_fixed_arguments(parser, args = None):
     parser.add_argument('--env_id', type=str, default=args.env_id if args != None else None, help="The id of the environment")
     parser.add_argument('--yaml', type=str, default=args.yaml if args != None else None, help="configuration file to launch exp through toml file!")
     parser.add_argument('--seed', type=int, default=args.seed if args != None else None, help="The id of the environment")
-    parser.add_argument('--algo', type=str, default=args.algo if args != None else None, help="Which algorithm to test", choices=["appo-all", "appo-two","ppo-clip"])
+    parser.add_argument('--algo', type=str, default=args.algo if args != None else None, help="Which algorithm to test", choices=["appo", "appo","ppo-clip"])
 
 def get_conf():
     parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")

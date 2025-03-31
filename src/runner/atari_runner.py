@@ -50,6 +50,20 @@ class AtariRunner(BaseRunner):
         
         return thunk
 
+    def reshape_(self, data):
+        obs, actions, log_probs, advantages, returns, values, old_logits  = data
+        # TODO(weijun): 添加observation_shape和discrete_action_space_n到args中
+        b_obs = obs.reshape((-1, ) + self.all_args.single_observation_space.shape)
+        b_actions = actions.reshape(-1)
+        b_log_probs = log_probs.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_advantages = advantages.reshape(-1)
+        b_values = values.reshape(-1)
+        b_old_logits = old_logits.reshape((-1, self.all_args.discrete_action_space_n))
+        
+        return b_obs, b_actions, b_log_probs, b_returns, b_advantages, b_values, b_old_logits
+
+
     def run(self):
         for iteration in trange(1, self.all_args.num_iterations + 1):
             # Annealing the rate if instructed to do so.
@@ -60,7 +74,8 @@ class AtariRunner(BaseRunner):
 
             self.collect_rollout()
                             
-            obs, actions, rewards, dones, logprobs, values, total_logits = self.buffer.pop()
+            data = self.reshape_(self.buffer.pop())
+            obs, actions, rewards, dones, logprobs, values, total_logits = data
 
             returns, advantages = compute_advantages(
                 args = self.all_args, 
@@ -73,8 +88,8 @@ class AtariRunner(BaseRunner):
             )
 
             buffer = (obs, actions, logprobs, returns, advantages, values, total_logits)
-
             self.trainer.update_one_episode(buffer)
+            
             self.writer.add_scalar("losses/SPS", int(self.global_step / (time.time() - self.start_time)))
     
     def collect_rollout(self):

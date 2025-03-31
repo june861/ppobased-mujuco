@@ -22,7 +22,7 @@ class BaseTrainer(object):
         self.vf_coef = args.vf_coef
         self.target_kl = args.target_kl
         self.batch_size = args.batch_size
-        self.mini_batch_size = args.mini_batch_size
+        self.mini_batch_size = args.minibatch_size
         self.sample_action_num = args.sample_action_num
         self.ent_coef = args.ent_coef
         
@@ -33,7 +33,7 @@ class BaseTrainer(object):
     def log_dict_(self, **kwargs):
         mini_dict_ = {}
         for key, value in kwargs.items():
-            if "imp_weights" in key:
+            if "imp_weight" in key:
                 log_key = key.replace("_","$",1).replace("_","/",1).replace("$","_")
             else:
                 log_key = key.replace("_","/",1)

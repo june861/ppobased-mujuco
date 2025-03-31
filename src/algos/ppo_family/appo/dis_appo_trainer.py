@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.distributions import Categorical
-from base.base_trainer import BaseTrainer
+from ..base.base_trainer import BaseTrainer
 
 class Discrete_APPO_Trainer(BaseTrainer):
     def __init__(self, args, agent, optimizer):

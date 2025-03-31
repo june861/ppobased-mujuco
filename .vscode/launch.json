@@ -14,7 +14,7 @@
                 "--seed", "1",
                 "--env_id", "HumanoidStandup-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
-                "--algo", "appo"
+                "--algo", "ppo-clip"
             ],
             "justMyCode": true,
         },

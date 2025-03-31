@@ -1,3 +1,3 @@
 from .base_buffer import *
-from .mujoco_buffer import *
-from .atari_buffer import *
+from .con_buffer import *
+from .dis_buffer import *

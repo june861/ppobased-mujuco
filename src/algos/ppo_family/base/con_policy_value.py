@@ -1,5 +1,14 @@
 # -*- encoding: utf-8 -*-
 '''
+@File       :con_network.py
+@Description:
+@Date       :2025/03/31 10:24:23
+@Author     :junweiluo
+@Version    :python
+'''
+
+# -*- encoding: utf-8 -*-
+'''
 @File    :   agent.py
 @Time    :   2025/03/25 22:17:24
 @Author  :   junewluo 
@@ -11,9 +20,8 @@ import torch.nn as nn
 from torch.distributions import Normal
 from utils import layer_init
 
-
-class Agent(nn.Module):
-    # DONE(junweiluo)：增加一个离散化动作的参数
+# policy & value network
+class Continous_PolicyValue(nn.Module):
     def __init__(self, envs, sample_action_num = 1):
         super().__init__()
         self.critic = nn.Sequential(
@@ -31,16 +39,13 @@ class Agent(nn.Module):
             layer_init(nn.Linear(64, np.prod(envs.single_action_space.shape)), std=0.01),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space.shape)))
-
-        # junweiluo: 增加参数，
         self.sample_action_num = sample_action_num 
     
-    # junweiluo: 增加函数
+    # sample action function
     def sample_action(self, probs):
         actions = []
         for _ in range(self.sample_action_num):
-            # i_action = torch.tanh(probs.sample()) * self.scale
-            # actions.append(i_action)
+            # there is no need use tanh() to scale action range.
             i_action = probs.sample()
             actions.append(i_action)
         actions = torch.stack(actions, dim = 1)

@@ -6,7 +6,7 @@
 @Author     :junweiluo
 @Version    :python
 '''
-
+import time
 import torch
 import numpy as np
 import gymnasium as gym
@@ -20,6 +20,7 @@ from stable_baselines3.common.atari_wrappers import (  # isort:skip
     MaxAndSkipEnv,
     NoopResetEnv,
 )
+
 
 class AtariRunner(BaseRunner):
     def __init__(self, config):
@@ -73,7 +74,8 @@ class AtariRunner(BaseRunner):
 
             buffer = (obs, actions, logprobs, returns, advantages, values, total_logits)
 
-            self.trainer.train(global_step = self.global_step, buffer = buffer)
+            self.trainer.update_one_episode(buffer)
+            self.writer.add_scalar("losses/SPS", int(self.global_step / (time.time() - self.start_time)))
     
     def collect_rollout(self):
         for step in range(0, self.all_args.num_steps):

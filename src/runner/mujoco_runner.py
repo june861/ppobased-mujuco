@@ -7,16 +7,16 @@
 @Version    :python
 '''
 import torch
+import time
 import numpy as np
 import gymnasium as gym
 from .base_runner import BaseRunner
 from utils import compute_advantages
-
+from tqdm import trange
 
 class MujocoRunner(BaseRunner):
     def __init__(self, config):
         super().__init__(config)
-    
     
     def make_envs(self, idx, run_name = None):
         def thunk():
@@ -38,7 +38,7 @@ class MujocoRunner(BaseRunner):
 
     def run(self):
         """ Main training loop."""
-        for iteration in range(1, self.all_args.num_iterations + 1):
+        for iteration in trange(1, self.all_args.num_iterations + 1):
             # Annealing the rate if instructed to do so.
             if self.all_args.anneal_lr:
                 frac = 1.0 - (iteration - 1.0) / self.all_args.num_iterations
@@ -46,7 +46,7 @@ class MujocoRunner(BaseRunner):
                 self.trainer.optimizer.param_groups[0]["lr"] = lrnow
             
             self.collect_rollout()
-            
+
             obs, actions, logprobs, rewards, dones, values, means, stds = self.buffer.pop()
 
             returns, advantages = compute_advantages(
@@ -56,14 +56,19 @@ class MujocoRunner(BaseRunner):
                 values = values, 
                 next_obs = self.next_obs, 
                 next_done = self.next_done, 
-                dones = dones
+                dones = dones,
             )
 
             buffer_ = (
                 obs, logprobs, actions, advantages, returns, values, means, stds
             )
             
-            self.trainer.train(buffer_, self.global_step)
+            for dict_ in self.trainer.update_one_episode(buffer_):
+                for k, v in dict_.items():
+                    self.writer.add_scalar(k, v)
+            
+            self.writer.add_scalar("losses/SPS", int(self.global_step / (time.time() - self.start_time)),)
+            
 
     
     def collect_rollout(self):

@@ -1,11 +1,13 @@
 # -*- encoding: utf-8 -*-
 '''
-@File       :agent.py
+@File       :dis_policy_value.py
 @Description:
-@Date       :2025/03/26 18:42:45
+@Date       :2025/03/31 10:36:01
 @Author     :junweiluo
 @Version    :python
 '''
+
+
 
 import numpy as np
 import torch
@@ -19,7 +21,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-class Agent(nn.Module):
+class Discrete_PolicyValue(nn.Module):
     def __init__(self, num_actions):
         super().__init__()
 
@@ -32,7 +34,8 @@ class Agent(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             layer_init(nn.Linear(64 * 7 * 7, 512)),
-            nn.LayerNorm(512),
+            # TODO(junweiluo): 离散环境测试梯度爆炸
+            # nn.LayerNorm(512),
             nn.ReLU(),
             
         )

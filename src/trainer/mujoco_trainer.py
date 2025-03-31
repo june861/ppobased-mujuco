@@ -139,7 +139,6 @@ class MujocoTrainer(BaseTrainer):
     
     def compute_ratios_family(self, newlogprob, mb_logprobs):
         """ return ratios family
-
         Args:
             newlogprob (_type_): _description_
             mb_logprobs (_type_): _description_

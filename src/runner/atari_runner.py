@@ -85,7 +85,8 @@ class AtariRunner(BaseRunner):
                 next_done = self.next_done, 
                 dones = dones
             )
-            # vb_obs, b_actions, b_log_probs, b_returns, b_advantages, b_values, b_old_logits
+              
+            # b_obs, b_actions, b_log_probs, b_returns, b_advantages, b_values, b_old_logits
             data = (obs, actions, logprobs, returns, advantages, values, total_logits)
             data = self.reshape_(data)
             

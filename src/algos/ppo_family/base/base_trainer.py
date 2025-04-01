@@ -36,7 +36,7 @@ class BaseTrainer(object):
         table = PrettyTable([f"{class_name}.attr", "value", "type"])
         for key, value in self.__dict__.items():
             table.add_row([key, value, type(value)])
-        self.logger.success(f'class {class_name} init successfully!\ntable') 
+        self.logger.success(f'class {class_name} init successfully!\n{table}') 
 
     def log_dict_(self, **kwargs):
         mini_dict_ = {}

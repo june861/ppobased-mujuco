@@ -11,13 +11,13 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.distributions import Categorical
-from base.base_trainer import BaseTrainer
+from ..base.base_trainer import BaseTrainer
 
 class Discrete_PPO2_Trainer(BaseTrainer):
     def __init__(self, args, agent, optimizer):
         super().__init__(args, agent, optimizer)
-        self.args.clip_coef = args.clip_coef
-        self.num_alter_logprobs = args.sample_action_num
+        self.clip_coef = args.clip_coef
+        self.num_alter_logprobs = min(args.sample_action_num, args.discrete_action_space_n.item())
     
     def compute_ratios_family(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
         # ppo-clip ratio
@@ -44,7 +44,7 @@ class Discrete_PPO2_Trainer(BaseTrainer):
     def compute_policy_loss(self, mb_advantages, ratio1):
         # Policy loss
         pg_loss1 = -mb_advantages * ratio1
-        pg_loss2 = -mb_advantages * torch.clamp(ratio1, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
+        pg_loss2 = -mb_advantages * torch.clamp(ratio1, 1 - self.clip_coef, 1 + self.clip_coef)
         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
         
         return pg_loss, pg_loss.item(), 0.0
@@ -74,8 +74,8 @@ class Discrete_PPO2_Trainer(BaseTrainer):
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
 
-        for start in range(0, self.args.batch_size, self.args.minibatch_size):
-            end = start + self.args.minibatch_size
+        for start in range(0, self.batch_size, self.mini_batch_size):
+            end = start + self.mini_batch_size
             mb_inds = b_inds[start:end]
 
             # The latest outputs of the policy network and value network
@@ -137,7 +137,7 @@ class Discrete_PPO2_Trainer(BaseTrainer):
             # param update
             self.optimizer.zero_grad()
             loss.backward()
-            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.batch_index += 1
 
@@ -147,8 +147,8 @@ class Discrete_PPO2_Trainer(BaseTrainer):
             imp_weight_max_ratio1 = max_ratio1,
             imp_weight_min_ratio2 = min_ratio2,
             imp_weight_max_ratio2 = max_ratio2,
-            losses_ratio1_clifracs =  ratio1_clipfracs / self.args.batch_size,
-            losses_ratio2_clipfracs =  ratio2_clipfracs / self.args.batch_size,
+            losses_ratio1_clifracs =  ratio1_clipfracs / self.batch_size,
+            losses_ratio2_clipfracs =  ratio2_clipfracs / self.batch_size,
         )
 
         # last epoch
@@ -156,7 +156,7 @@ class Discrete_PPO2_Trainer(BaseTrainer):
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-            final_dict_ = self.log_mini_dict_(
+            final_dict_ = self.log_dict_(
                     losses_pg_loss_1 = pg_loss_1,
                     losses_pg_loss_2 = pg_loss_2,
                     losses_pg_loss = pg_loss.item(),

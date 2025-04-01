@@ -80,6 +80,7 @@ if __name__ == "__main__":
     replay_buffer = Buffer(args)
     runner.trainer = trainer
     runner.buffer = replay_buffer
+    runner.all_args.logger.info(f'Trainer is {runner.trainer}, Buffer is {runner.buffer}')
     
     runner.env_reset()
     runner.run()

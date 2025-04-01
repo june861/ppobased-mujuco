@@ -1,13 +1,13 @@
 #!/bin/bash
 
 exp="atari"
-seeds=(1)
+seeds=(1 2 3)
 update_epochs=(4)
-algo="appo-all"
+algo="appo"
 envs=(
     "AssaultNoFrameskip-v4"
-    # "AlienNoFrameskip-v4"
-    # "AmidarNoFrameskip-v4"
+    "AlienNoFrameskip-v4"
+    "AmidarNoFrameskip-v4"
     # "AsterixNoFrameskip-v4"
     # "AsteroidsNoFrameskip-v4"
     # "AtlantisNoFrameskip-v4"
@@ -78,7 +78,7 @@ do
         for env_id in "${envs[@]}"
         do
 
-            python -m src.algos.atari.run --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
+            python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
 
             # echo "ppo-clip continous action space"
             # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"

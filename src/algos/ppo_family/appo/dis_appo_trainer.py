@@ -18,7 +18,6 @@ class Discrete_APPO_Trainer(BaseTrainer):
         super().__init__(args, agent, optimizer)
         self.clip_coef = args.clip_coef
         self.num_alter_logprobs = min(args.sample_action_num, args.discrete_action_space_n.item())
-        self.dis_params()
     
     def compute_ratios_family(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
         # ppo-clip ratio
@@ -51,9 +50,9 @@ class Discrete_APPO_Trainer(BaseTrainer):
         # ratio2_norm = ratio2 / ratio2.mean()
         # ratio2_ = torch.clamp(ratio2, 0, 1 + self.args.clip_coef)
 
-        ratio2_ = torch.clamp(ratio2, 0, 1 + self.clip_coef)
-        log_ratio2 = ratio2_.log()
-        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (log_ratio2**2)).mean()
+        # ratio2_ = torch.clamp(ratio2, 0, 1 + self.clip_coef)
+        # log_ratio2 = ratio2_.log()
+        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
         pg_loss = pg_loss_1 + pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()

@@ -18,11 +18,11 @@ class MujocoRunner(BaseRunner):
     def __init__(self, config):
         super().__init__(config)
     
-    def make_envs(self, idx, run_name = None):
+    def make_envs(self, idx):
         def thunk():
             if self.all_args.capture_video and idx == 0:
                 env = gym.make(self.all_args.env_id, render_mode="rgb_array")
-                env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
+                env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
             else:
                 env = gym.make(self.all_args.env_id)
             env = gym.wrappers.FlattenObservation(env)  # deal with dm_control's Dict observation space

@@ -6,9 +6,10 @@
 @Author     :junweiluo
 @Version    :python
 '''
+import os
 import torch
 import sys
-import inspect
+from prettytable import PrettyTable
 
 class BaseTrainer(object):
     def __init__(self, args, agent, optimizer):
@@ -29,6 +30,13 @@ class BaseTrainer(object):
         self.agent = agent
         self.optimizer = optimizer
         self.batch_index = 0
+
+    def dis_params(self):
+        class_name = self.__class__.__name__ 
+        table = PrettyTable([f"{class_name}.attr", "value", "type"])
+        for key, value in self.__dict__.items():
+            table.add_row([key, value, type(value)])
+        self.logger.success(f'class {class_name} init successfully!\ntable') 
 
     def log_dict_(self, **kwargs):
         mini_dict_ = {}

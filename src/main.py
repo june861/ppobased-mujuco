@@ -32,6 +32,8 @@ if __name__ == "__main__":
             from algos.ppo_family.appo.dis_appo_trainer import Discrete_APPO_Trainer as Trainer
         elif args.algo == "ppo-clip":
             from algos.ppo_family.ppo_clip.dis_ppo2_trainer import Discrete_PPO2_Trainer as Trainer
+        elif args.algo == "ppo-penalty":
+            from algos.ppo_family.ppo_penalty.dis_ppo_kl_trainer import Discrete_PPOPenalty_Trainer as Trainer
     elif args.env_type == "mujoco":
         from runner import MujocoRunner as Runner
         from buffer import MujocoBuffer as Buffer
@@ -39,11 +41,16 @@ if __name__ == "__main__":
         if args.algo == "appo":
             from algos.ppo_family.appo.con_appo_trainer import Continous_APPO_Trainer as Trainer
         elif args.algo == "ppo-clip":
-            from algos.ppo_family.ppo_clip.con_ppo2_trainer import Continous_PPO2_Trainer as Trainer     
+            from algos.ppo_family.ppo_clip.con_ppo2_trainer import Continous_PPO2_Trainer as Trainer
+        elif args.algo == "ppo-penalty":
+            from algos.ppo_family.ppo_penalty.con_ppo_kl_trainer import Continous_PPOPenalty_Trainer as Trainer
+    else:
+        args.logger.error(f"env_type:{args.env_type} hasn't not yet implemented! Only Support ['mujoco', 'atari]")
+        sys.exit({"ExitCode": 1, "ErrorType": "NotImplementedError"})
     
     runner = Runner(config_)
     envs = gym.vector.SyncVectorEnv(
-        [runner.make_envs(i, runner.run_name) for i in range(runner.all_args.num_envs)]
+        [runner.make_envs(i) for i in range(runner.all_args.num_envs)]
     )
 
     if args.env_type == "mujoco" and not isinstance(envs.single_action_space, gym.spaces.Box):

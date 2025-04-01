@@ -74,8 +74,7 @@ class AtariRunner(BaseRunner):
 
             self.collect_rollout()
                             
-            data = self.reshape_(self.buffer.pop())
-            obs, actions, rewards, dones, logprobs, values, total_logits = data
+            obs, actions, rewards, dones, logprobs, values, total_logits = self.buffer.pop()
 
             returns, advantages = compute_advantages(
                 args = self.all_args, 
@@ -86,9 +85,13 @@ class AtariRunner(BaseRunner):
                 next_done = self.next_done, 
                 dones = dones
             )
-
-            buffer = (obs, actions, logprobs, returns, advantages, values, total_logits)
-            self.trainer.update_one_episode(buffer)
+            # vb_obs, b_actions, b_log_probs, b_returns, b_advantages, b_values, b_old_logits
+            data = (obs, actions, logprobs, returns, advantages, values, total_logits)
+            data = self.reshape_(data)
+            
+            for dict_ in self.trainer.update_one_episode(data):
+                for k,v in dict_.items():
+                    self.writer.add_scalar(k, v)
             
             self.writer.add_scalar("losses/SPS", int(self.global_step / (time.time() - self.start_time)))
     

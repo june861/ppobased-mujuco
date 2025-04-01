@@ -17,6 +17,9 @@
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
                 "--algo", "appo",
             ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+              },
             "justMyCode": true,
         },
 
@@ -24,15 +27,19 @@
             "name": "Python Debugger: atari",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/src/main.py",
             "console": "integratedTerminal",
             "args": [
                 "--env_type", "atari",
                 "--seed", "1",
                 "--env_id", "AssaultNoFrameskip-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
-                "--algo", "appo-all",
+                "--algo", "appo",
             ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+              },
+            "justMyCode": true,
         }
     ]
 }

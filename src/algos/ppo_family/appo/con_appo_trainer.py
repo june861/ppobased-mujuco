@@ -38,7 +38,10 @@ class Continous_APPO_Trainer(BaseTrainer):
             end = start + self.mini_batch_size
             mb_inds = b_inds[start:end]
             _, newlogprob, entropy, newvalue, new_mean_std = self.agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
-            ratio1, ratio2 = self.compute_ratios_family(newlogprob, b_logprobs[mb_inds])
+            ratio1, ratio2 = self.compute_ratios_family(
+                newlogprob = newlogprob, 
+                b_logprobs = b_logprobs[mb_inds]
+            )
             
             mb_advantages = b_advantages[mb_inds]
             if self.norm_adv:
@@ -150,24 +153,6 @@ class Continous_APPO_Trainer(BaseTrainer):
         pg_loss = pg_loss_1 + pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
-    
-    def compute_ratios_family(self, newlogprob, mb_logprobs):
-        """ return ratios family
-
-        Args:
-            newlogprob (_type_): _description_
-            mb_logprobs (_type_): _description_
-        """
-
-        total_logratio = newlogprob - mb_logprobs
-        logratio1 = total_logratio[:,0]
-        ratio1 = logratio1.exp()
-
-        logratio2 = total_logratio[:,1:]
-        ratio2 = torch.sum(logratio2, dim=1).exp()
-        ratio2 = ratio2 / (self.sample_action_num - 1)
-        
-        return ratio1, ratio2
         
     
     

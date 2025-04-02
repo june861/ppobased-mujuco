@@ -15,6 +15,7 @@ class BaseTrainer(object):
     def __init__(self, args, agent, optimizer):
         
         # common parameters
+        self.env_type = args.env_type
         self.logger = args.logger
         self.max_grad_norm = args.max_grad_norm
         self.update_epochs = args.update_epochs
@@ -30,6 +31,7 @@ class BaseTrainer(object):
         self.agent = agent
         self.optimizer = optimizer
         self.batch_index = 0
+    
 
     def dis_params(self):
         class_name = self.__class__.__name__ 
@@ -66,9 +68,59 @@ class BaseTrainer(object):
         
         return v_loss  
 
-    def compute_ratios_family(self):
-        self.logger.error("function: compute_ratios_family had not yet implement!")
-        sys.exit({"ExitCode": 1, "ERROR": "NotImplementedError"})
+
+    def compute_dis_ratios_family(self, **kwargs):
+        new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions \
+            = kwargs["new_log_prob"], kwargs["mb_log_probs"], kwargs["new_logits"], kwargs["mb_old_logits"], kwargs["mb_actions"]
+        
+        # ppo-clip ratio
+        log_probs = new_log_prob - mb_log_probs
+        ratio1 = log_probs.exp()
+        # caculate other actions ratio
+        mask_ = torch.ones_like(mb_old_logits)
+        mask_[torch.arange(mb_old_logits.shape[0]), mb_actions] = 0.0
+        selected_indice = torch.multinomial(mask_, num_samples = self.num_alter_logprobs).squeeze()
+        selected_indice_0 = torch.arange(mb_old_logits.shape[0])
+        if self.num_alter_logprobs > 1:
+            selected_indice_0 = selected_indice_0.unsqueeze(1).expand(-1, self.num_alter_logprobs)
+        old_logprobs = mb_old_logits[selected_indice_0, selected_indice]
+        new_logprobs = new_logits[selected_indice_0, selected_indice]
+        log_ratio2 = new_logprobs - old_logprobs
+        if len(log_ratio2.shape) == 1:
+            log_ratio2 = log_ratio2.unsqueeze(1)
+        
+        # !!! ratio2 for grad update!!!
+        raw_ratio2 = torch.clamp(log_ratio2.exp(), 1 - self.clip_coef, 1 + self.clip_coef) 
+        grad_ratio2 = torch.mean(raw_ratio2, dim = 1)
+        # ratio2 to log
+        # for observe ratio2 special situation, we use prod operation to expand extreme value functions.
+        prod_ratio2 = torch.sum(log_ratio2, dim = 1).exp()
+        # mean ratio2
+        mean_ratio2 = torch.mean(log_ratio2.exp(), dim = 1)
+
+        return ratio1, grad_ratio2, prod_ratio2, mean_ratio2
+    
+    def compute_con_ratios_family(self, **kwargs):
+        newlogprob, mb_logprobs = kwargs["newlogprob"], kwargs["mb_logprobs"]
+        total_logratio = newlogprob - mb_logprobs
+        logratio1 = total_logratio[:,0]
+        ratio1 = logratio1.exp()
+
+        logratio2 = total_logratio[:,1:]
+        ratio2 = torch.sum(logratio2, dim=1).exp()
+        ratio2 = ratio2 / (self.sample_action_num - 1)
+        
+        return ratio1, ratio2
+
+    def compute_ratios_family(self, **kwargs):
+        
+        map_ = {
+            "atari": self.compute_dis_ratios_family,
+            "mujoco": self.compute_con_ratios_family,
+        }
+        
+        func = map_.get(self.env_type, self._not_implemented)
+        return func(**kwargs)
     
     def compute_policy_loss(self):
         self.logger.error("function: compute_policy_loss had not yet implement!")

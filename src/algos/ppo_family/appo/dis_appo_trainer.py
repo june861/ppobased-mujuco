@@ -19,39 +19,12 @@ class Discrete_APPO_Trainer(BaseTrainer):
         self.clip_coef = args.clip_coef
         self.num_alter_logprobs = min(args.sample_action_num, args.discrete_action_space_n.item())
     
-    def compute_ratios_family(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
-        # ppo-clip ratio
-        log_probs = new_log_prob - mb_log_probs
-        ratio1 = log_probs.exp()
-        # caculate other actions ratio
-        mask_ = torch.ones_like(mb_old_logits)
-        mask_[torch.arange(mb_old_logits.shape[0]), mb_actions] = 0.0
-        selected_indice = torch.multinomial(mask_, num_samples = self.num_alter_logprobs).squeeze()
-        selected_indice_0 = torch.arange(mb_old_logits.shape[0])
-        if self.num_alter_logprobs > 1:
-            selected_indice_0 = selected_indice_0.unsqueeze(1).expand(-1, self.num_alter_logprobs)
-        old_logprobs = mb_old_logits[selected_indice_0, selected_indice]
-        new_logprobs = new_logits[selected_indice_0, selected_indice]
-        log_ratio2 = new_logprobs - old_logprobs
-        if len(log_ratio2.shape) == 1:
-            log_ratio2 = log_ratio2.unsqueeze(1)
-        # mean operations
-        raw_ratio2 = log_ratio2.exp()
-        ratio2 = torch.sum(raw_ratio2, dim = 1) / self.num_alter_logprobs
-
-        return ratio1, ratio2
-    
     def compute_policy_loss(self, mb_advantages, ratio1, ratio2):
         # Policy loss
         pg_loss1 = -mb_advantages * ratio1
         pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
         
-        # ratio2_norm = ratio2 / ratio2.mean()
-        # ratio2_ = torch.clamp(ratio2, 0, 1 + self.args.clip_coef)
-
-        # ratio2_ = torch.clamp(ratio2, 0, 1 + self.clip_coef)
-        # log_ratio2 = ratio2_.log()
         pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
         pg_loss = pg_loss_1 + pg_loss_2
         
@@ -78,9 +51,13 @@ class Discrete_APPO_Trainer(BaseTrainer):
 
         b_obs, b_actions, b_log_probs, b_returns, b_advantages, b_values, b_old_logits = data
         np.random.shuffle(b_inds)
+        
         ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
+        mean_ratio2_devations, prod_ratio2_devations = 0.0, 0.0
+        min_prod_ratio2, max_prod_ratio2 = 10.0, 0.0
+        min_mean_ratio2, max_mean_ratio2 = 10.0, 0.0
 
         for start in range(0, self.batch_size, self.mini_batch_size):
             end = start + self.mini_batch_size
@@ -92,7 +69,7 @@ class Discrete_APPO_Trainer(BaseTrainer):
             )
 
             # Probability ratio
-            ratio1, ratio2 = self.compute_ratios_family(
+            ratio1, grad_ratio2, prod_ratio2, mean_ratio2 = self.compute_ratios_family(
                 new_log_prob = new_log_prob, 
                 mb_log_probs = b_log_probs[mb_inds], 
                 new_logits = new_logits, 
@@ -106,7 +83,7 @@ class Discrete_APPO_Trainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
             # Policy loss
-            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, ratio2 = ratio2)
+            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, ratio2 = grad_ratio2)
             # Value loss
             v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], newvalue = new_value, mb_values = b_values[mb_inds])
             # Policy entropy
@@ -134,16 +111,22 @@ class Discrete_APPO_Trainer(BaseTrainer):
                 
                 # ratios family
                 min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
-                min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
+                min_prod_ratio2, max_prod_ratio2 = min(np.min(prod_ratio2.detach().cpu().numpy()), min_prod_ratio2), max(np.max(prod_ratio2.detach().cpu().numpy()), max_prod_ratio2)
+                min_mean_ratio2, max_mean_ratio2 = min(np.min(grad_ratio2.detach().cpu().numpy()), min_mean_ratio2), max(np.max(grad_ratio2.detach().cpu().numpy()), max_mean_ratio2)
                 ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.clip_coef).float().sum()
-                ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.clip_coef).float().sum()  
+                # prod_ratio2_clipfracs += (torch.abs(grad_ratio2.detach().cpu() - 1.0)).float().sum()
+                prod_ratio2_devations += (torch.abs(prod_ratio2.detach().cpu() - 1.0)).float().sum()
+                mean_ratio2_devations += (torch.abs(mean_ratio2.detach().cpu() - 1.0)).float().sum()  
                 
                 mini_dict_ = self.log_dict_(
                     losses_old_approx_kl = old_approx_kl.item(),
                     losses_approx_kl = approx_kl.item(),
-                    imp_weight_ratio1 = np.mean(ratio1.detach().cpu().numpy()),
-                    imp_weight_ratio2 = np.mean(ratio2.detach().cpu().numpy()),
                     losses_kl_div = kl,
+                    imp_weight_ratio1 = np.mean(ratio1.detach().cpu().numpy()),
+                    imp_weight_grad_ratio2 = np.mean(grad_ratio2.detach().cpu().numpy()),
+                    imp_weight_prod_ratio2 = np.mean(prod_ratio2.detach().cpu().numpy()),
+                    imp_weight_mean_ratio2 = np.mean(mean_ratio2.detach().cpu().numpy()),
+
                 )
                                   
                 yield mini_dict_
@@ -154,10 +137,10 @@ class Discrete_APPO_Trainer(BaseTrainer):
             losses_grad_norm = grad,    
             imp_weight_min_ratio1 = min_ratio1,
             imp_weight_max_ratio1 = max_ratio1,
-            imp_weight_min_ratio2 = min_ratio2,
-            imp_weight_max_ratio2 = max_ratio2,
+            losses_mean_ratio2_devations = mean_ratio2_devations / self.batch_size,
+            losses_prod_ratio2_devations = prod_ratio2_devations / self.batch_size,
             losses_ratio1_clifracs =  ratio1_clipfracs / self.batch_size,
-            losses_ratio2_clipfracs =  ratio2_clipfracs / self.batch_size,
+            # losses_ratio2_clipfracs =  ratio2_clipfracs / self.batch_size,
         )
 
         if epoch == self.update_epochs - 1:

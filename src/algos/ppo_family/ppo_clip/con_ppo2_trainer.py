@@ -39,7 +39,10 @@ class Continous_PPO2_Trainer(BaseTrainer):
             mb_inds = b_inds[start:end]
             _, newlogprob, entropy, newvalue, new_mean_std = self.agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
 
-            ratio1, ratio2 = self.compute_ratios_family(newlogprob, b_logprobs[mb_inds])
+            ratio1, ratio2 = self.compute_ratios_family(
+                newlogprob = newlogprob, 
+                mb_logprobs = b_logprobs[mb_inds]
+            )
             logratio1 = ratio1.log()
 
             with torch.no_grad():
@@ -85,6 +88,7 @@ class Continous_PPO2_Trainer(BaseTrainer):
             grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.batch_index += 1
+    
         # log data for every update_epochs
         dict_ = self.log_mini_dict_(
             imp_weight_min_ratio1 = min_ratio1,
@@ -143,23 +147,23 @@ class Continous_PPO2_Trainer(BaseTrainer):
         
         return pg_loss, pg_loss.item(), 0.0
     
-    def compute_ratios_family(self, newlogprob, mb_logprobs):
-        """ return ratios family
+    # def compute_ratios_family(self, newlogprob, mb_logprobs):
+    #     """ return ratios family
 
-        Args:
-            newlogprob (_type_): _description_
-            mb_logprobs (_type_): _description_
-        """
+    #     Args:
+    #         newlogprob (_type_): _description_
+    #         mb_logprobs (_type_): _description_
+    #     """
 
-        total_logratio = newlogprob - mb_logprobs
-        logratio1 = total_logratio[:,0]
-        ratio1 = logratio1.exp()
+    #     total_logratio = newlogprob - mb_logprobs
+    #     logratio1 = total_logratio[:,0]
+    #     ratio1 = logratio1.exp()
 
-        logratio2 = total_logratio[:,1:]
-        ratio2 = torch.sum(logratio2, dim=1).exp()
-        ratio2 = ratio2 / (self.sample_action_num - 1)
+    #     logratio2 = total_logratio[:,1:]
+    #     ratio2 = torch.sum(logratio2, dim=1).exp()
+    #     ratio2 = ratio2 / (self.sample_action_num - 1)
         
-        return ratio1, ratio2
+    #     return ratio1, ratio2
         
     
     

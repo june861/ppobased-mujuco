@@ -19,28 +19,6 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
         self.penalty_coef = args.penalty_coef
         self.num_alter_logprobs = args.sample_action_num
     
-    def compute_ratios_family(self, new_log_prob, mb_log_probs, new_logits, mb_old_logits, mb_actions):
-        # ppo-clip ratio
-        log_probs = new_log_prob - mb_log_probs
-        ratio1 = log_probs.exp()
-        # caculate other actions ratio
-        mask_ = torch.ones_like(mb_old_logits)
-        mask_[torch.arange(mb_old_logits.shape[0]), mb_actions] = 0.0
-        selected_indice = torch.multinomial(mask_, num_samples = self.num_alter_logprobs).squeeze()
-        selected_indice_0 = torch.arange(mb_old_logits.shape[0])
-        if self.num_alter_logprobs > 1:
-            selected_indice_0 = selected_indice_0.unsqueeze(1).expand(-1, self.num_alter_logprobs)
-        old_logprobs = mb_old_logits[selected_indice_0, selected_indice]
-        new_logprobs = new_logits[selected_indice_0, selected_indice]
-        log_ratio2 = new_logprobs - old_logprobs
-        if len(log_ratio2.shape) == 1:
-            log_ratio2 = log_ratio2.unsqueeze(1)
-        # mean operations
-        raw_ratio2 = log_ratio2.exp()
-        ratio2 = torch.sum(raw_ratio2, dim = 1) / self.num_alter_logprobs
-
-        return ratio1, ratio2
-    
     def compute_policy_loss(self, mb_advantages, ratio1, kl):
         pg_loss_1 = (-mb_advantages * ratio1).mean()
         # pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.args.clip_coef), (1 + self.args.clip_coef))

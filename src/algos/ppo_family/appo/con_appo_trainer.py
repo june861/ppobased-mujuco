@@ -144,12 +144,7 @@ class Continous_APPO_Trainer(BaseTrainer):
         pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
         
-        # ratio2_norm = ratio2 / ratio2.mean()
-        # ratio2_ = torch.clamp(ratio2, 0, 1 + self.clip_coef)
-
-        ratio2_ = torch.clamp(ratio2, 0, 1 + self.clip_coef)
-        log_ratio2 = ratio2_.log()
-        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (log_ratio2**2)).mean()
+        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
         pg_loss = pg_loss_1 + pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()

@@ -26,7 +26,7 @@ do
         do
             echo "appo continous action space"
             appo_yaml="src/conf/con_appo_run.yaml"
-            /home/wangchenxu/anaconda3/envs/mujoco_v4/bin/python ./src/algos/mujoco/run.py --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp
+            CUDA_VISIBLE_DEVICES=5,6,7 python src.main --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp
 
             # echo "ppo-clip continous action space"
             # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"

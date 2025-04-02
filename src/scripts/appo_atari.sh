@@ -78,7 +78,7 @@ do
         for env_id in "${envs[@]}"
         do
 
-            python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
+            CUDA_VISIBLE_DEVICES=5,6,7 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
 
             # echo "ppo-clip continous action space"
             # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"

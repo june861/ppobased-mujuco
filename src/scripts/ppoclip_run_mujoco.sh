@@ -39,7 +39,7 @@ do
         for env_id in "${envs[@]}"
         do
             echo "ppo-clip continous action space"
-            python -m src.algos.mujoco.run --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp  
+            CUDA_VISIBLE_DEVICES=5,6,7 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp  
             # python ./src/algos/mujoco/run.py --seed $seed  --yaml $ppoclip_yaml --env_id $env_id --env_type $exp         
         done
         echo "Experiment with env=$env_id seed=$seed finished."

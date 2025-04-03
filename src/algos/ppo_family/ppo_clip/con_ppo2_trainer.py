@@ -10,7 +10,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from base.base_trainer import BaseTrainer
+from ..base.base_trainer import BaseTrainer
 from utils import compute_kld
 
 class Continous_PPO2_Trainer(BaseTrainer):
@@ -30,7 +30,7 @@ class Continous_PPO2_Trainer(BaseTrainer):
             _type_: _description_
         """
         b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds = data
-        ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0, 0.0
+        ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
         
@@ -56,8 +56,8 @@ class Continous_PPO2_Trainer(BaseTrainer):
                 # ratios family
                 min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
                 min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
-                ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
-                ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
+                ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.clip_coef).float().sum()
+                ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.clip_coef).float().sum()
                 
                 # log data for every mini-batch data                    
                 mini_dict_ =  self.log_dict_(
@@ -90,7 +90,7 @@ class Continous_PPO2_Trainer(BaseTrainer):
             self.batch_index += 1
     
         # log data for every update_epochs
-        dict_ = self.log_mini_dict_(
+        dict_ = self.log_dict_(
             imp_weight_min_ratio1 = min_ratio1,
             imp_weight_max_ratio1 = max_ratio1,
             imp_weight_min_ratio2 = min_ratio2,
@@ -103,7 +103,7 @@ class Continous_PPO2_Trainer(BaseTrainer):
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-            final_dict_ = self.log_mini_dict_(
+            final_dict_ = self.log_dict_(
                     losses_pg_loss_1 = pg_loss_1,
                     losses_pg_loss_2 = pg_loss_2,
                     losses_pg_loss = pg_loss.item(),
@@ -142,28 +142,9 @@ class Continous_PPO2_Trainer(BaseTrainer):
             _type_: _description_
         """
         pg_loss1 = -mb_advantages * ratio1
-        pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
         
         return pg_loss, pg_loss.item(), 0.0
-    
-    # def compute_ratios_family(self, newlogprob, mb_logprobs):
-    #     """ return ratios family
-
-    #     Args:
-    #         newlogprob (_type_): _description_
-    #         mb_logprobs (_type_): _description_
-    #     """
-
-    #     total_logratio = newlogprob - mb_logprobs
-    #     logratio1 = total_logratio[:,0]
-    #     ratio1 = logratio1.exp()
-
-    #     logratio2 = total_logratio[:,1:]
-    #     ratio2 = torch.sum(logratio2, dim=1).exp()
-    #     ratio2 = ratio2 / (self.sample_action_num - 1)
-        
-    #     return ratio1, ratio2
-        
     
     

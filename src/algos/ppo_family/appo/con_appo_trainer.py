@@ -40,7 +40,7 @@ class Continous_APPO_Trainer(BaseTrainer):
             _, newlogprob, entropy, newvalue, new_mean_std = self.agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
             ratio1, ratio2 = self.compute_ratios_family(
                 newlogprob = newlogprob, 
-                b_logprobs = b_logprobs[mb_inds]
+                mb_logprobs = b_logprobs[mb_inds]
             )
             
             mb_advantages = b_advantages[mb_inds]

@@ -16,7 +16,7 @@ from utils import compute_kld
 class Continous_PPOPenalty_Trainer(BaseTrainer):
     def __init__(self, args, agent, optimizer):
         super().__init__(args, agent, optimizer)
-        self.penalty_coef = args.penalty_cofe
+        self.penalty_coef = args.penalty_coef
     
     def ppo_update(self, data, b_inds, epoch):
         """ ppo update epochs
@@ -30,7 +30,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             _type_: _description_
         """
         b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values, b_means, b_stds = data
-        ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0, 0.0
+        ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
         
@@ -81,23 +81,24 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 # ratios family
                 min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
                 min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
-                ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
-                ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.args.clip_coef).float().sum()
+                ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.clip_coef).float().sum()
+                ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.clip_coef).float().sum()
                 
                 # log data for every mini-batch data                    
                 mini_dict_ =  self.log_dict_(
-                    losses_old_approx_kl=old_approx_kl.item(),
-                    losses_approx_kl=approx_kl.item(),
-                    losses_kl=kl.detach().cpu().item(),
-                    imp_weight_ratio1=np.mean(ratio1.detach().cpu().numpy()),
-                    imp_weight_ratio2=np.mean(ratio2.detach().cpu().numpy()),
+                    losses_old_approx_kl = old_approx_kl.item(),
+                    losses_approx_kl = approx_kl.item(),
+                    losses_kl = kl.detach().cpu().item(),
+                    imp_weight_ratio1 = np.mean(ratio1.detach().cpu().numpy()),
+                    imp_weight_ratio2 = np.mean(ratio2.detach().cpu().numpy()),
+                    losses_penalty_coef = self.penalty_coef,
                 )
                 yield mini_dict_
             
             self.batch_index += 1
         
         # log data for every update_epochs
-        dict_ = self.log_mini_dict_(
+        dict_ = self.log_dict_(
             imp_weight_min_ratio1 = min_ratio1,
             imp_weight_max_ratio1 = max_ratio1,
             imp_weight_min_ratio2 = min_ratio2,
@@ -110,7 +111,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-            final_dict_ = self.log_mini_dict_(
+            final_dict_ = self.log_dict_(
                     losses_pg_loss_1 = pg_loss_1,
                     losses_pg_loss_2 = pg_loss_2,
                     losses_pg_loss = pg_loss.item(),
@@ -150,8 +151,10 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             _type_: _description_
         """
         pg_loss_1 = (-mb_advantages * ratio1).mean()
-        # pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.args.clip_coef), (1 + self.args.clip_coef))
+        # pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         # pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
+        
+        # diff from PPO2: add KL loss
         pg_loss = pg_loss_1 + self.penalty_coef * kl
         
         return pg_loss, pg_loss_1.item(), 0.0

@@ -2,6 +2,7 @@
 
 echo "Mujoco Run Scripts"
 exp="mujoco"
+algo="ppo-clip"
 seeds=(1 2 3)
 update_epochs=(10)
 envs=(
@@ -20,7 +21,7 @@ envs=(
 
 # set root dir, it will return "src/" abs path
 PROJECT_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
-CONFIG_PATH="$PROJECT_ROOT/conf/con_ppoclip_run.yaml"
+CONFIG_PATH="$PROJECT_ROOT/conf/con_ppo2_run.yaml"
 
 # check config file
 if [ ! -f "$CONFIG_PATH" ]; then
@@ -39,7 +40,7 @@ do
         for env_id in "${envs[@]}"
         do
             echo "ppo-clip continous action space"
-            CUDA_VISIBLE_DEVICES=5,6,7 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp  
+            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo
             # python ./src/algos/mujoco/run.py --seed $seed  --yaml $ppoclip_yaml --env_id $env_id --env_type $exp         
         done
         echo "Experiment with env=$env_id seed=$seed finished."

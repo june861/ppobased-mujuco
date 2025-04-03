@@ -27,10 +27,12 @@ class BaseTrainer(object):
         self.mini_batch_size = args.minibatch_size
         self.sample_action_num = args.sample_action_num
         self.ent_coef = args.ent_coef
+        self.clip_coef = args.clip_coef
         
         self.agent = agent
         self.optimizer = optimizer
         self.batch_index = 0
+        
     
 
     def dis_params(self):

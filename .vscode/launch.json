@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: mujoco",
+            "name": "mujoco appo",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/main.py",
@@ -16,6 +16,42 @@
                 "--env_id", "HumanoidStandup-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
                 "--algo", "appo",
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+              },
+            "justMyCode": true,
+        },
+        {
+            "name": "mujoco ppo-clip",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--env_type", "mujoco",
+                "--seed", "1",
+                "--env_id", "HumanoidStandup-v4",
+                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_ppo2_run.yaml",
+                "--algo", "ppo-clip",
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+              },
+            "justMyCode": true,
+        },
+        {
+            "name": "mujoco ppo-kl",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--env_type", "mujoco",
+                "--seed", "1",
+                "--env_id", "HumanoidStandup-v4",
+                "--yaml", "${workspaceFolder}/src/conf/con_ppo1_run.yaml",
+                "--algo", "ppo-penalty",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
@@ -34,12 +70,14 @@
                 "--seed", "1",
                 "--env_id", "AssaultNoFrameskip-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
-                "--algo", "ppo-clip",
+                "--algo", "appo",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
               },
             "justMyCode": true,
         }
+
+
     ]
 }

@@ -19,13 +19,26 @@ class Discrete_APPO_Trainer(BaseTrainer):
         self.clip_coef = args.clip_coef
         self.num_alter_logprobs = min(args.sample_action_num, args.discrete_action_space_n.item())
     
-    def compute_policy_loss(self, mb_advantages, ratio1, ratio2):
+    def compute_policy_loss(self, mb_advantages, ratio1, ratio2, mb_old_logits, new_logits, mb_actions):
         # Policy loss
         pg_loss1 = -mb_advantages * ratio1
         pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
         
-        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
+        # 
+        mask_ = torch.ones_like(mb_old_logits)
+        mask_[torch.arange(mb_old_logits.shape[0]), mb_actions] = 0.0
+        selected_indice = torch.multinomial(mask_, num_samples = self.num_alter_logprobs).squeeze()
+        selected_indice_0 = torch.arange(mb_old_logits.shape[0])
+        if self.num_alter_logprobs > 1:
+            selected_indice_0 = selected_indice_0.unsqueeze(1).expand(-1, self.num_alter_logprobs)
+        old_logprobs = mb_old_logits[selected_indice_0, selected_indice]
+        new_logprobs = new_logits[selected_indice_0, selected_indice]
+        tmp1 = (new_logprobs.exp() - old_logprobs.exp())**2 / old_logprobs.exp()
+        pg_loss_2 = (0.5 * tmp1).mean()
+        
+        
+        # pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
         pg_loss = pg_loss_1 + pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
@@ -74,7 +87,7 @@ class Discrete_APPO_Trainer(BaseTrainer):
                 mb_log_probs = b_log_probs[mb_inds], 
                 new_logits = new_logits, 
                 mb_old_logits = b_old_logits[mb_inds], 
-                mb_actions = b_actions[mb_inds]
+                mb_actions = b_actions[mb_inds],
             )
 
             # Advantage normalization
@@ -83,7 +96,13 @@ class Discrete_APPO_Trainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
             # Policy loss
-            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, ratio2 = grad_ratio2)
+            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(
+                mb_advantages = mb_advantages, 
+                ratio1 = ratio1, ratio2 = grad_ratio2, 
+                mb_old_logits = b_old_logits[mb_inds], 
+                new_logits = new_logits,
+                mb_actions = b_actions[mb_inds],
+            )
             # Value loss
             v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], newvalue = new_value, mb_values = b_values[mb_inds])
             # Policy entropy

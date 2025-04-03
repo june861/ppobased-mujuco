@@ -33,7 +33,7 @@ if __name__ == "__main__":
         elif args.algo == "ppo-clip":
             from algos.ppo_family.ppo_clip.dis_ppo2_trainer import Discrete_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
-            from algos.ppo_family.ppo_penalty.dis_ppo_kl_trainer import Discrete_PPOPenalty_Trainer as Trainer
+            from algos.ppo_family.ppo_penalty.dis_ppo1_trainer import Discrete_PPOPenalty_Trainer as Trainer
     elif args.env_type == "mujoco":
         from runner import MujocoRunner as Runner
         from buffer import MujocoBuffer as Buffer
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         elif args.algo == "ppo-clip":
             from algos.ppo_family.ppo_clip.con_ppo2_trainer import Continous_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
-            from algos.ppo_family.ppo_penalty.con_ppo_kl_trainer import Continous_PPOPenalty_Trainer as Trainer
+            from algos.ppo_family.ppo_penalty.con_ppo1_trainer import Continous_PPOPenalty_Trainer as Trainer
     else:
         args.logger.error(f"env_type:{args.env_type} hasn't not yet implemented! Only Support ['mujoco', 'atari]")
         sys.exit({"ExitCode": 1, "ErrorType": "NotImplementedError"})

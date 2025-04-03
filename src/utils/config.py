@@ -42,10 +42,10 @@ def get_conf():
 
     # Parse remaining arguments, allowing command-line overrides
     args = parser.parse_args(remaining_argv)
-    if args.env_type == "atari":
-        args.exp_name = f'{args.env_id}_{args.algo}_seed{args.seed}_update{args.update_epochs}_clipcoef{args.clip_coef}'
-    else:
-        args.exp_name = f'{args.env_id}_seed{args.seed}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}'
+    # if args.env_type == "atari":
+    args.exp_name = f'{args.env_id}_{args.algo}_seed{args.seed}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}'
+    # else:
+    # args.exp_name = f'{args.env_id}_seed{args.seed}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}'
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     args.logger = getLogger(f"{args.env_id}_{int(time.time())}", "colored")
     args.batch_size = int(args.num_envs * args.num_steps)

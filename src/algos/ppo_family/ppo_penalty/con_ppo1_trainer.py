@@ -68,12 +68,6 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
             
-            # dynamic adjust penalty coefficience
-            if kl > 1.5 * self.target_kl:
-                self.penalty_coef *= 2
-            elif kl < self.target_kl / 1.5:
-                self.penalty_coef /= 2
-            
             with torch.no_grad():
                 # calculate approx_kl http://joschu.net/blog/kl-approx.html
                 old_approx_kl = (-logratio1).mean()
@@ -96,7 +90,13 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 yield mini_dict_
             
             self.batch_index += 1
-        
+
+        # dynamic adjust penalty coefficience
+        if kl > 1.5 * self.target_kl:
+            self.penalty_coef *= 2
+        elif kl < self.target_kl / 1.5:
+            self.penalty_coef /= 2        
+
         # log data for every update_epochs
         dict_ = self.log_dict_(
             imp_weight_min_ratio1 = min_ratio1,

@@ -60,7 +60,7 @@
         },
 
         {
-            "name": "Python Debugger: atari",
+            "name": "atari appo & ppo-clip",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/main.py",
@@ -74,6 +74,25 @@
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
+              },
+            "justMyCode": true,
+        },
+
+        {
+            "name": "atari ppo-penalty",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--env_type", "atari",
+                "--seed", "1",
+                "--env_id", "AssaultNoFrameskip-v4",
+                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
+                "--algo", "ppo-penalty",
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
               },
             "justMyCode": true,
         }

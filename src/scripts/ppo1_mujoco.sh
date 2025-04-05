@@ -6,16 +6,16 @@ algo="ppo-penalty"
 seeds=(1 2 3)
 update_epochs=(10)
 envs=(
-    "HumanoidStandup-v4"
-    "Humanoid-v4"
+    # "HumanoidStandup-v4"
+    # "Humanoid-v4"
     # "HalfCheetah-v4"
     # "Ant-v4"
 
-    # "Hopper-v4"
-    # "Reacher-v4"
-    # "Walker2d-v4"
-    # "InvertedDoublePendulum-v4"
-    # "InvertedPendulum-v4"
+    "Hopper-v4"
+    "Reacher-v4"
+    "Walker2d-v4"
+    "InvertedDoublePendulum-v4"
+    "InvertedPendulum-v4"
 )
 
 # set root dir, it will return "src/" abs path

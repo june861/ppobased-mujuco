@@ -4,7 +4,7 @@
 experiment:
   torch_deterministic: true  # Whether to set torch.backends.cudnn.deterministic to True
   cuda: true  # Whether to use CUDA by default
-  track: true  # Whether to track the experiment using Weights and Biases
+  track: false  # Whether to track the experiment using Weights and Biases
   wandb_project_name: "cleanRL-atari-debbuger"  # The project name for WandB
   capture_video: false  # Whether to capture videos of agent performance
   
@@ -30,6 +30,7 @@ algorithm:
   max_grad_norm: !!float 0.5  # The maximum norm for gradient clipping
   target_kl: null  # The target KL divergence threshold
   penalty_coef: !!float 0.2
+  decay_delta: !!float 1.0
 
 # ===========================
 # 🕹️ Runtime Configuration

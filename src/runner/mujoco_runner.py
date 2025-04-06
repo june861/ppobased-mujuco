@@ -68,6 +68,7 @@ class MujocoRunner(BaseRunner):
                 frac = 1.0 - (iteration - 1.0) / self.all_args.num_iterations
                 lrnow = frac * self.all_args.learning_rate
                 self.trainer.optimizer.param_groups[0]["lr"] = lrnow
+                self.trainer.decay_delta = frac * self.all_args.decay_delta
             
             self.collect_rollout()
 

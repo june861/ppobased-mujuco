@@ -18,6 +18,7 @@ class Discrete_APPO_Trainer(BaseTrainer):
         super().__init__(args, agent, optimizer)
         self.clip_coef = args.clip_coef
         self.num_alter_logprobs = min(args.sample_action_num, args.discrete_action_space_n.item())
+        self.decay_delta = args.decay_delta
     
     def compute_policy_loss(self, mb_advantages, ratio1, ratio2, mb_old_logits, new_logits, mb_actions):
         # Policy loss
@@ -39,7 +40,7 @@ class Discrete_APPO_Trainer(BaseTrainer):
         
         
         # pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
-        pg_loss = pg_loss_1 + pg_loss_2
+        pg_loss = pg_loss_1 + self.decay_delta * pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
     

@@ -52,6 +52,8 @@ algorithm:
   max_grad_norm: !!float 0.5
   # Target KL divergence threshold; if exceeded, training stops early
   target_kl: null  # YAML does not support None, hence use 0.0
+  # decay delta
+  decay_delta: !!float 1.0
 
 
 # ===========================

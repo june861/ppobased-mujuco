@@ -54,6 +54,8 @@ algorithm:
   target_kl: !!float 0.01  # YAML does not support None, hence use 0.0
   # KL divergence coefficence; 
   penalty_coef: !!float 0.2
+  # decay delta
+  decay_delta: !!float 1.0
 
 
 # ===========================

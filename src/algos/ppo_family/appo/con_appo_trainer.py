@@ -17,6 +17,7 @@ class Continous_APPO_Trainer(BaseTrainer):
     def __init__(self, args, agent, optimizer):
         super().__init__(args, agent, optimizer)
         self.clip_coef = args.clip_coef
+        self.decay_delta = args.decay_delta
     
     def ppo_update(self, data, b_inds, epoch):
         """ ppo update epochs
@@ -140,12 +141,21 @@ class Continous_APPO_Trainer(BaseTrainer):
         Returns:
             _type_: _description_
         """
+
+        
+
         pg_loss1 = -mb_advantages * ratio1
         pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
         
         pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
-        pg_loss = pg_loss_1 + pg_loss_2
+
+        # target_ratio = 2.0
+        # current_ratio = (pg_loss_1.abs() / pg_loss_2.abs()).mean().detach()
+        # delta = current_ratio / target_ratio
+        # pg_loss = pg_loss_1 + delta * pg_loss_2
+
+        pg_loss = pg_loss_1 + self.decay_delta * pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         

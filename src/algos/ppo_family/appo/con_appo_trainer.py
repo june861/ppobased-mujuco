@@ -47,8 +47,14 @@ class Continous_APPO_Trainer(BaseTrainer):
             mb_advantages = b_advantages[mb_inds]
             if self.norm_adv:
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+            # self.logger.info(f"adv mean:{torch.mean(mb_advantages)}, adv min:{torch.min(mb_advantages)}, adv max:{torch.max(mb_advantages)}")
             # Policy loss
-            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, ratio2 = ratio2)
+            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(
+                mb_advantages = mb_advantages, 
+                ratio1 = ratio1, 
+                ratio2 = ratio2,
+                mb_old_logprobs = b_logprobs[mb_inds],
+            )
             # value loss
             v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], mb_values = b_values[mb_inds], newvalue = newvalue)
             # entropy loss
@@ -131,7 +137,7 @@ class Continous_APPO_Trainer(BaseTrainer):
             for dict_ in self.ppo_update(data = data, b_inds = b_inds, epoch = epoch):
                 yield dict_
         
-    def compute_policy_loss(self, mb_advantages, ratio1, ratio2):
+    def compute_policy_loss(self, mb_advantages, ratio1, ratio2, **kwargs):
         """ compute policy loss
 
         Args:
@@ -148,14 +154,17 @@ class Continous_APPO_Trainer(BaseTrainer):
         pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
         pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
         
-        pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
+        # pg_loss_2 = (0.5 * torch.abs(mb_advantages.detach()) * (ratio2 - 1)**2).mean()
 
         # target_ratio = 2.0
         # current_ratio = (pg_loss_1.abs() / pg_loss_2.abs()).mean().detach()
         # delta = current_ratio / target_ratio
         # pg_loss = pg_loss_1 + delta * pg_loss_2
+        
+        mb_old_logprobs = kwargs["mb_old_logprobs"]
+        pg_loss_2 = (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
 
-        pg_loss = pg_loss_1 + self.decay_delta * pg_loss_2
+        pg_loss = pg_loss_1 +  pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         

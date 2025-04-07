@@ -109,9 +109,9 @@ class BaseTrainer(object):
         ratio1 = logratio1.exp()
 
         logratio2 = total_logratio[:,1:]
-        ratio2 = torch.sum(logratio2, dim=1).exp()
-        ratio2 = ratio2 / (self.sample_action_num - 1)
-        # ratio2 = logratio2.exp()
+        # ratio2 = torch.sum(logratio2, dim=1).exp()
+        # ratio2 = ratio2 / (self.sample_action_num - 1)
+        ratio2 = logratio2.exp()
         
         return ratio1, ratio2
 

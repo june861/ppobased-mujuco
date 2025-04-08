@@ -9,11 +9,11 @@ envs=(
     # "HumanoidStandup-v4"
     # "Humanoid-v4"
     # "HalfCheetah-v4"
-    # "Ant-v4"
+    "Ant-v4"
 
     # "Hopper-v4"
     # "Reacher-v4"
-    "Walker2d-v4"
+    # "Walker2d-v4"
     # "InvertedDoublePendulum-v4"
     # "InvertedPendulum-v4"
 )
@@ -27,7 +27,7 @@ do
         do
             echo "appo continous action space"
             appo_yaml="src/conf/con_appo_run.yaml"
-            CUDA_VISIBLE_DEVICES=5,6,7 python -m src.main --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp --algo $algo
+            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp --algo $algo
 
             # echo "ppo-clip continous action space"
             # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"

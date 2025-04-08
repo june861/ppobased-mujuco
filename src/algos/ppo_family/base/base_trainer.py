@@ -79,28 +79,14 @@ class BaseTrainer(object):
         log_probs = new_log_prob - mb_log_probs
         ratio1 = log_probs.exp()
         # caculate other actions ratio
-        mask_ = torch.ones_like(mb_old_logits)
+        mask_ = torch.ones_like(mb_old_logits, dtype=torch.bool)
         mask_[torch.arange(mb_old_logits.shape[0]), mb_actions] = 0.0
-        selected_indice = torch.multinomial(mask_, num_samples = self.num_alter_logprobs).squeeze()
-        selected_indice_0 = torch.arange(mb_old_logits.shape[0])
-        if self.num_alter_logprobs > 1:
-            selected_indice_0 = selected_indice_0.unsqueeze(1).expand(-1, self.num_alter_logprobs)
-        old_logprobs = mb_old_logits[selected_indice_0, selected_indice]
-        new_logprobs = new_logits[selected_indice_0, selected_indice]
+        old_logprobs = mb_old_logits[mask_].reshape(mb_old_logits.size(0), -1)
+        new_logprobs = new_logits[mask_].reshape(mb_old_logits.size(0), -1)
         log_ratio2 = new_logprobs - old_logprobs
-        if len(log_ratio2.shape) == 1:
-            log_ratio2 = log_ratio2.unsqueeze(1)
-        
-        # !!! ratio2 for grad update!!!
-        raw_ratio2 = torch.clamp(log_ratio2.exp(), 1 - self.clip_coef, 1 + self.clip_coef) 
-        grad_ratio2 = torch.mean(raw_ratio2, dim = 1)
-        # ratio2 to log
-        # for observe ratio2 special situation, we use prod operation to expand extreme value functions.
-        prod_ratio2 = torch.sum(log_ratio2, dim = 1).exp()
-        # mean ratio2
-        mean_ratio2 = torch.mean(log_ratio2.exp(), dim = 1)
+        ratio2 = log_ratio2.exp()
 
-        return ratio1, grad_ratio2, prod_ratio2, mean_ratio2
+        return ratio1, ratio2, old_logprobs
     
     def compute_con_ratios_family(self, **kwargs):
         newlogprob, mb_logprobs = kwargs["newlogprob"], kwargs["mb_logprobs"]

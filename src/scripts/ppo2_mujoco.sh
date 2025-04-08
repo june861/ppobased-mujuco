@@ -30,8 +30,6 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 
 
-
-
 # diff seeds & diff envs
 for seed in "${seeds[@]}"
 do

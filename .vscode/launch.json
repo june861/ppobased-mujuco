@@ -33,7 +33,7 @@
                 "--seed", "1",
                 "--env_id", "HumanoidStandup-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_ppo2_run.yaml",
-                "--algo", "ppo-clip",
+                "--algo", "appo",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
@@ -68,9 +68,9 @@
             "args": [
                 "--env_type", "atari",
                 "--seed", "1",
-                "--env_id", "AssaultNoFrameskip-v4",
+                "--env_id", "AsterixNoFrameskip-v4",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
-                "--algo", "appo",
+                "--algo", "ppo-clip",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"

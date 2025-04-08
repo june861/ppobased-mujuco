@@ -30,11 +30,11 @@ fi
 
 
 # 循环遍历每个 seed 值，启动 main.py
-for seed in "${seeds[@]}"
+for env_id in "${envs[@]}"
 do
-    for e in "${update_epochs[@]}"
+    for seed in "${seeds[@]}"
     do
-        for env_id in "${envs[@]}"
+        for e in "${update_epochs[@]}"
         do
             echo "ppo-penalty continous action space"
             CUDA_VISIBLE_DEVICES=0 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo

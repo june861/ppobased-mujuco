@@ -31,11 +31,11 @@ fi
 
 
 # diff seeds & diff envs
-for seed in "${seeds[@]}"
+for env_id in "${envs[@]}"
 do
-    for e in "${update_epochs[@]}"
+    for seed in "${seeds[@]}"
     do
-        for env_id in "${envs[@]}"
+        for e in "${update_epochs[@]}"
         do
             echo "ppo-clip continous action space"
             CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo

@@ -13,8 +13,8 @@
             "args": [
                 "--env_type", "mujoco",
                 "--seed", "1",
-                "--env_id", "HumanoidStandup-v4",
-                "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/con_appo_run.yaml",
+                "--env_id", "Humanoid-v5",
+                "--yaml",  "${workspaceFolder}/src/conf/con_appo_run.yaml",
                 "--algo", "appo",
             ],
             "env": {
@@ -68,7 +68,7 @@
             "args": [
                 "--env_type", "atari",
                 "--seed", "1",
-                "--env_id", "AsterixNoFrameskip-v4",
+                "--env_id", "ALE/Asterix-v5",
                 "--yaml", "/home/weijun.luo/ppobased-mujuco/src/conf/dis_exp_run.yaml",
                 "--algo", "ppo-clip",
             ],

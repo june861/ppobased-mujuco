@@ -10,9 +10,12 @@ import time
 import torch
 import numpy as np
 import gymnasium as gym
+import ale_py
+gym.register_envs(ale_py)
 from .base_runner import BaseRunner
 from utils import compute_advantages
 from tqdm import trange
+from gymnasium.wrappers import AtariPreprocessing, ResizeObservation, GrayscaleObservation, FrameStackObservation
 from stable_baselines3.common.atari_wrappers import (  # isort:skip
     ClipRewardEnv,
     EpisodicLifeEnv,
@@ -25,29 +28,59 @@ from stable_baselines3.common.atari_wrappers import (  # isort:skip
 class AtariRunner(BaseRunner):
     def __init__(self, config):
         super().__init__(config)
+    
+    # v4
+    # def make_envs(self, idx):
+    #     def thunk():
+    #         if self.all_args.capture_video and idx == 0:
+    #             env = gym.make(self.all_args.env_id, render_mode="rgb_array")
+    #             env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
+    #         else:
+    #             env = gym.make(self.all_args.env_id)
+    #         env = gym.wrappers.RecordEpisodeStatistics(env)
+    #         if self.all_args.capture_video:
+    #             if idx == 0:
+    #                 env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
+    #         env = NoopResetEnv(env, noop_max=30)
+    #         env = MaxAndSkipEnv(env, skip=4)
+    #         env = EpisodicLifeEnv(env)
+    #         if "FIRE" in env.unwrapped.get_action_meanings():
+    #             env = FireResetEnv(env)
+    #         env = ClipRewardEnv(env)
+    #         env = gym.wrappers.ResizeObservation(env, (84, 84))
+    #         env = gym.wrappers.GrayScaleObservation(env)
+    #         env = gym.wrappers.FrameStack(env, 4)
+    #         return env
         
-    def make_envs(self, idx):
+    #     return thunk
+    
+    # v5
+    def make_envs(self, idx, skip_frame = 4):
         def thunk():
+            env = gym.make(self.all_args.env_id, render_mode="rgb_array" if self.all_args.capture_video and idx == 0 else None, frameskip=1,)
             if self.all_args.capture_video and idx == 0:
-                env = gym.make(self.all_args.env_id, render_mode="rgb_array")
                 env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
-            else:
-                env = gym.make(self.all_args.env_id)
-            env = gym.wrappers.RecordEpisodeStatistics(env)
-            if self.all_args.capture_video:
-                if idx == 0:
-                    env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
-            env = NoopResetEnv(env, noop_max=30)
-            env = MaxAndSkipEnv(env, skip=4)
+            # env = RecordEpisodeStatistics(env)
+            # env = NoopResetEnv(env, noop_max=30)
+            # env = MaxAndSkipEnv(env, skip= skip_frame)
+            env = AtariPreprocessing(
+                env,
+                noop_max=30,
+                frame_skip=4,
+                screen_size=84,
+                grayscale_obs=True,
+                grayscale_newaxis=False,
+                scale_obs=False
+            )
             env = EpisodicLifeEnv(env)
             if "FIRE" in env.unwrapped.get_action_meanings():
                 env = FireResetEnv(env)
             env = ClipRewardEnv(env)
-            env = gym.wrappers.ResizeObservation(env, (84, 84))
-            env = gym.wrappers.GrayScaleObservation(env)
-            env = gym.wrappers.FrameStack(env, 4)
+            env = ResizeObservation(env, (84, 84))
+            # env = GrayscaleObservation(env, keep_dim = True)
+            env = FrameStackObservation(env, skip_frame)
             return env
-        
+
         return thunk
 
     def reshape_(self, data):

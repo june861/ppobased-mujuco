@@ -29,7 +29,7 @@ class MujocoRunner(BaseRunner):
             env = gym.wrappers.RecordEpisodeStatistics(env)
             env = gym.wrappers.ClipAction(env)
             env = gym.wrappers.NormalizeObservation(env)
-            env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
+            env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), observation_space = env.observation_space)
             env = gym.wrappers.NormalizeReward(env, gamma=self.all_args.gamma)
             env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
             return env
@@ -114,5 +114,9 @@ class MujocoRunner(BaseRunner):
             self.next_done = np.logical_or(terminations, truncations)
             self.next_obs, self.next_done = torch.Tensor(self.next_obs).to(self.all_args.device), torch.Tensor(self.next_done).to(self.all_args.device)
             
-            if "final_info" in infos:
-                self.log_episode(infos)
+            # if "final_info" in infos:
+            #     self.log_episode(infos)
+                
+            for i, info in enumerate(infos):
+                if 'episode' in info:
+                    self.log_episode(infos)

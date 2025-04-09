@@ -8,7 +8,7 @@ update_epochs=(10)
 envs=(
     # "HumanoidStandup-v4"
     # "Humanoid-v4"
-    "HalfCheetah-v4"
+    # "HalfCheetah-v4"
     # "Ant-v4"
 
     # "Hopper-v4"

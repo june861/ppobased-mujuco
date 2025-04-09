@@ -3,19 +3,19 @@
 echo "Mujoco Run Scripts"
 exp="mujoco"
 algo="ppo-clip"
-seeds=(1 2 3)
+seeds=(1 2 3 4 5)
 update_epochs=(10)
 envs=(
-    # "HumanoidStandup-v4"
-    # "Humanoid-v4"
-    "HalfCheetah-v4"
-    # "Ant-v4"
+    # "HumanoidStandup-v5"
+    # "Humanoid-v5"
+    "HalfCheetah-v5"
+    # "Ant-v5"
 
-    # "Hopper-v4"
-    # "Reacher-v4"
-    # "Walker2d-v4"
-    # "InvertedDoublePendulum-v4"
-    # "InvertedPendulum-v4"
+    # "Hopper-v5"
+    # "Reacher-v5"
+    # "Walker2d-v5"
+    # "InvertedDoublePendulum-v5"
+    # "InvertedPendulum-v5"
 )
 
 
@@ -38,8 +38,7 @@ do
         for e in "${update_epochs[@]}"
         do
             echo "ppo-clip continous action space"
-            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo
-            # python ./src/algos/mujoco/run.py --seed $seed  --yaml $ppoclip_yaml --env_id $env_id --env_type $exp         
+            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo     
         done
         echo "Experiment with env=$env_id seed=$seed finished."
     done

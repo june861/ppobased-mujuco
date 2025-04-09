@@ -15,7 +15,7 @@ gym.register_envs(ale_py)
 from .base_runner import BaseRunner
 from utils import compute_advantages
 from tqdm import trange
-from gymnasium.wrappers import AtariPreprocessing, ResizeObservation, GrayscaleObservation, FrameStackObservation
+from gymnasium.wrappers import AtariPreprocessing, ResizeObservation, FrameStackObservation, GrayscaleObservation
 from stable_baselines3.common.atari_wrappers import (  # isort:skip
     ClipRewardEnv,
     EpisodicLifeEnv,

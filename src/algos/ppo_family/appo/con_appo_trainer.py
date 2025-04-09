@@ -164,7 +164,7 @@ class Continous_APPO_Trainer(BaseTrainer):
         mb_old_logprobs = kwargs["mb_old_logprobs"]
         pg_loss_2 = (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
 
-        pg_loss = pg_loss_1 +  self.decay_delta * pg_loss_2
+        pg_loss = pg_loss_1 +  pg_loss_2
         
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         

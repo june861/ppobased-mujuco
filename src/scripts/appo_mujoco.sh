@@ -3,19 +3,19 @@
 echo "Mujoco Run Scripts"
 exp="mujoco"
 algo="appo"
-seeds=(1 2 3)
+seeds=(1 2 3 4 5)
 update_epochs=(10)
 envs=(
-    # "HumanoidStandup-v4"
-    # "Humanoid-v4"
-    # "HalfCheetah-v4"
-    # "Ant-v4"
+    # "HumanoidStandup-v5"
+    # "Humanoid-v5"
+    "HalfCheetah-v5"
+    # "Ant-v5"
 
-    # "Hopper-v4"
-    # "Reacher-v4"
-    # "Walker2d-v4"
-    # "InvertedDoublePendulum-v4"
-    # "InvertedPendulum-v4"
+    # "Hopper-v5"
+    # "Reacher-v5"
+    # "Walker2d-v5"
+    # "InvertedDoublePendulum-v5"
+    # "InvertedPendulum-v5"
 )
 
 # 循环遍历每个 seed 值，启动 main.py
@@ -28,10 +28,7 @@ do
             echo "appo continous action space"
             appo_yaml="src/conf/con_appo_run.yaml"
             CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp --algo $algo
-
-            # echo "ppo-clip continous action space"
-            # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"
-            # /home/wangchenxu/anaconda3/envs/mujoco_v4/bin/python ./src/algos/mujoco/run.py --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp         
+    
         done
         echo "Experiment with seed=$seed finished."
     done

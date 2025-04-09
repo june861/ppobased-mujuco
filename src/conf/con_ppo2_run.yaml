@@ -70,7 +70,7 @@ runtime:
 # ===========================
 action_sample:
   # Number of actions to sample per step, different param between APPO and PPO-Clip
-  sample_action_num: 10
+  sample_action_num: 2
   # ratio2 require grad
   # require_grad: True
 

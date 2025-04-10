@@ -6,11 +6,16 @@ algo="ppo-clip"
 seeds=(1 2 3 4 5)
 update_epochs=(10)
 envs=(
+    # vcis 12
     # "HumanoidStandup-v5"
     # "Humanoid-v5"
+    # "Swimmer-v5"
+
+    # vcis 7
     "HalfCheetah-v5"
     # "Ant-v5"
 
+    # vcis 13
     # "Hopper-v5"
     # "Reacher-v5"
     # "Walker2d-v5"

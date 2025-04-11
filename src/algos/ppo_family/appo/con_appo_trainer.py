@@ -173,10 +173,14 @@ class Continous_APPO_Trainer(BaseTrainer):
         
         
         # v3: 0.5 * |A|* \pi_{old} * (r1 - 1)**2 / d
-        mb_old_probs_r2 = kwargs["mb_old_logprobs"][:,1:].exp()
-        mb_advantages_ = mb_advantages.unsqueeze(1).expand(-1, mb_old_probs_r2.shape[1])
-        pg_loss_2 = (0.5 * torch.abs(mb_advantages_) * mb_old_probs_r2 * (ratio2 - 1)**2).mean() / self.single_action_space_n
-        
+        # mb_old_probs_r2 = kwargs["mb_old_logprobs"][:,1:].exp()
+        # mb_advantages_ = mb_advantages.unsqueeze(1).expand(-1, mb_old_probs_r2.shape[1])
+        # pg_loss_2 = (0.5 * torch.abs(mb_advantages_) * mb_old_probs_r2 * (ratio2 - 1)**2).mean() / self.single_action_space_n
+    
+        # v4: 0.5 * \pi_{old} * (r1 - 1)**2
+        mb_old_logprobs = kwargs["mb_old_logprobs"]
+        pg_loss_2 = (mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
+
         pg_loss = pg_loss_1 +  pg_loss_2
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         

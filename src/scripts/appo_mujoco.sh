@@ -13,13 +13,13 @@ envs=(
 
     # vcis 7
     # "HalfCheetah-v5"
-    # "Ant-v5"
+    "Ant-v5"
 
     # vcis 13
     # "Hopper-v5"
     # "Reacher-v5"
     # "Walker2d-v5"
-    "InvertedDoublePendulum-v5"
+    # "InvertedDoublePendulum-v5"
     # "InvertedPendulum-v5"
 )
 

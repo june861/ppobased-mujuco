@@ -26,6 +26,7 @@ class BaseTrainer(object):
         self.batch_size = args.batch_size
         self.mini_batch_size = args.minibatch_size
         self.sample_action_num = args.sample_action_num
+        self.single_action_space_n = args.single_action_space.shape[0]
         self.ent_coef = args.ent_coef
         self.clip_coef = args.clip_coef
         

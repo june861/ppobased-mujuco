@@ -9,11 +9,12 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppo_continuous_actionpy
 import os
 import sys
+import torch
 import gymnasium as gym
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 import torch.optim as optim
 from utils import get_conf
-
+torch.set_num_threads(1)
 
 if __name__ == "__main__":
     args = get_conf()

@@ -43,7 +43,7 @@ def get_conf():
     # Parse remaining arguments, allowing command-line overrides
     args = parser.parse_args(remaining_argv)
     # if args.env_type == "atari":
-    args.exp_name = f'{args.env_id}_{args.algo}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}_{args.decay_delta}_v4'
+    args.exp_name = f'{args.env_id}_{args.algo}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}_{args.decay_delta}_v5'
     # else:
     # args.exp_name = f'{args.env_id}_seed{args.seed}_update{args.update_epochs}_clipcoef{args.clip_coef}_sample{args.sample_action_num}'
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

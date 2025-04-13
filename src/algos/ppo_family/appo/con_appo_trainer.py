@@ -55,6 +55,7 @@ class Continous_APPO_Trainer(BaseTrainer):
                 ratio1 = ratio1, 
                 ratio2 = ratio2,
                 mb_old_logprobs = b_logprobs[mb_inds],
+                mb_returns_vars = torch.var(b_returns[mb_inds]).item(),
             )
             # value loss
             v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], mb_values = b_values[mb_inds], newvalue = newvalue)
@@ -182,9 +183,15 @@ class Continous_APPO_Trainer(BaseTrainer):
         # pg_loss_2 = (mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
     
         # v5: 0.5 * \pi_{old} * (r1 - 1)**2
+        # mb_old_logprobs = kwargs["mb_old_logprobs"]
+        # pg_loss_2 = self.decay_delta * (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
+        
+        # v6: 0.5 * var_returns * \pi_{old} * (r1 - 1)**2
         mb_old_logprobs = kwargs["mb_old_logprobs"]
-        pg_loss_2 = self.decay_delta * (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
-
+        mb_returns_vars = kwargs["mb_returns_vars"]
+        pg_loss_2 = (mb_returns_vars * 0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
+        
+        
         pg_loss = pg_loss_1 +  pg_loss_2
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         

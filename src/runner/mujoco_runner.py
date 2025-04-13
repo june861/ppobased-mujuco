@@ -93,6 +93,7 @@ class MujocoRunner(BaseRunner):
                 for k, v in dict_.items():
                     self.writer.add_scalar(k, v)
             
+            self.writer.add_scalar("charts/var_returns", torch.var(returns).item())
             self.writer.add_scalar("losses/SPS", int(self.global_step / (time.time() - self.start_time)),)
             
 

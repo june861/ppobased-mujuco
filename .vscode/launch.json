@@ -13,7 +13,7 @@
             "args": [
                 "--env_type", "mujoco",
                 "--seed", "1",
-                "--env_id", "Humanoid-v5",
+                "--env_id", "HalfCheetah-v5",
                 "--yaml",  "${workspaceFolder}/src/conf/con_appo_run.yaml",
                 "--algo", "appo",
             ],

@@ -52,6 +52,7 @@ class Discrete_PPO2_Trainer(BaseTrainer):
         ratio2_devations = 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
+        total_size = 0
 
         for start in range(0, self.batch_size, self.mini_batch_size):
             end = start + self.mini_batch_size
@@ -84,12 +85,6 @@ class Discrete_PPO2_Trainer(BaseTrainer):
             entropy_loss = new_entropy.mean()
             # Total loss
             loss = pg_loss + v_loss * self.vf_coef - entropy_loss * self.ent_coef
-
-            # param update
-            self.optimizer.zero_grad()
-            loss.backward()
-            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
-            self.optimizer.step()
             
             with torch.no_grad():
                 # calculate approx_kl http://joschu.net/blog/kl-approx.html
@@ -121,6 +116,19 @@ class Discrete_PPO2_Trainer(BaseTrainer):
                                   
                 yield mini_dict_
             
+            # ppo-clip with earlu stop
+            if self.target_kl != None and approx_kl > 1.5 * self.target_kl:
+                self.logger.warning(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl:.5f}")
+                break
+
+            # param update
+            self.optimizer.zero_grad()
+            loss.backward()
+            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
+            self.optimizer.step()
+
+
+            total_size += self.mini_batch_size
             self.batch_index += 1
 
         dict_ = self.log_dict_(

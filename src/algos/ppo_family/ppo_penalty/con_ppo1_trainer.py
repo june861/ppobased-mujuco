@@ -91,11 +91,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             
             self.batch_index += 1
 
-        # dynamic adjust penalty coefficience
-        if kl > 1.5 * self.target_kl:
-            self.penalty_coef *= 2
-        elif kl < self.target_kl / 1.5:
-            self.penalty_coef /= 2        
+   
 
         # log data for every update_epochs
         dict_ = self.log_dict_(
@@ -105,6 +101,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             imp_weight_max_ratio2 = max_ratio2,
             losses_ratio1_clifracs = ratio1_clipfracs / self.batch_size,
             losses_ratio2_clifracs = ratio2_clipfracs / self.batch_size,
+            losses_penalty_coef = self.penalty_coef,
         )
         # last epoch
         if epoch == self.update_epochs - 1:
@@ -120,7 +117,13 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                     losses_explained_variance = explained_var,
                 )
             dict_ = {**dict_, **final_dict_}
-            
+        
+        # dynamic adjust penalty coefficience
+        if kl > 1.5 * self.target_kl:
+            self.penalty_coef *= 2
+        elif kl < self.target_kl / 1.5:
+            self.penalty_coef /= 2     
+    
         yield dict_            
     
     def update_one_episode(self, data):

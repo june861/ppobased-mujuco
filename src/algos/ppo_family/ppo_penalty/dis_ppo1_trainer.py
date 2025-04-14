@@ -79,7 +79,6 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
 
-
             # 计算KL
             kl = torch.distributions.kl.kl_divergence(
                 Categorical(logits=b_old_logits[mb_inds]), 
@@ -108,6 +107,7 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
                 logratio1 = ratio1.detach().log()
                 old_approx_kl = (-logratio1).mean()
                 approx_kl = ((ratio1 - 1) - logratio1).mean()
+
                 
                 # ratios family
                 min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
@@ -132,12 +132,6 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
                 yield mini_dict_
             
             self.batch_index += 1
-        
-        # dynamic adjust penalty coefficience
-        if kl > 1.5 * self.target_kl:
-            self.penalty_coef *= 2
-        elif kl < self.target_kl / 1.5:
-            self.penalty_coef /= 2
 
         dict_ = self.log_dict_(
             losses_grad_norm = grad,    
@@ -146,6 +140,7 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
             losses_mean_ratio2_devations = mean_ratio2_devations / self.batch_size,
             losses_prod_ratio2_devations = prod_ratio2_devations / self.batch_size,
             losses_ratio1_clifracs =  ratio1_clipfracs / self.batch_size,
+            losses_penalty_coef = self.penalty_coef,
             # losses_ratio2_clipfracs =  ratio2_clipfracs / self.batch_size,
         )
 
@@ -162,5 +157,11 @@ class Discrete_PPOPenalty_Trainer(BaseTrainer):
                     losses_explained_variance = explained_var,
                 )
             dict_ = {**dict_, **final_dict_}
+
+        # dynamic adjust penalty coefficience
+        if approx_kl > 1.5 * self.target_kl:
+            self.penalty_coef *= 2
+        elif approx_kl < self.target_kl / 1.5:
+            self.penalty_coef /= 2
         
         yield dict_

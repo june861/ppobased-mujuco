@@ -12,8 +12,8 @@ envs=(
     # "Swimmer-v5"
 
     # vcis 7
-    # "HalfCheetah-v5"
-    "Ant-v5"
+    "HalfCheetah-v5"
+    # "Ant-v5"
 
     # vcis 13
     # "Hopper-v5"

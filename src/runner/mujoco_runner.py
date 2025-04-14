@@ -69,9 +69,9 @@ class MujocoRunner(BaseRunner):
                 lrnow = frac * self.all_args.learning_rate
                 self.trainer.optimizer.param_groups[0]["lr"] = lrnow
                 
-                self.trainer.decay_delta = 1.0 - self.all_args.decay_delta * frac
+                # self.trainer.decay_delta = 1.0 - self.all_args.decay_delta * frac
                 # self.trainer.decay_delta = min(0.2 + (iteration - 1) * (0.8 / (self.all_args.num_iterations // 2 - 1)), 1.0)
-                self.writer.add_scalar("charts/decay_coef", self.trainer.decay_delta)
+                # self.writer.add_scalar("charts/decay_coef", self.trainer.decay_delta)
             
             self.collect_rollout()
 

@@ -26,7 +26,7 @@ class BaseTrainer(object):
         self.batch_size = args.batch_size
         self.mini_batch_size = args.minibatch_size
         self.sample_action_num = args.sample_action_num
-        self.single_action_space_n = args.single_action_space.shape[0]
+        # self.single_action_space_n = args.single_action_space.shape[0]
         self.ent_coef = args.ent_coef
         self.clip_coef = args.clip_coef
         
@@ -94,10 +94,7 @@ class BaseTrainer(object):
         total_logratio = newlogprob - mb_logprobs
         logratio1 = total_logratio[:,0]
         ratio1 = logratio1.exp()
-
         logratio2 = total_logratio[:,1:]
-        # ratio2 = torch.sum(logratio2, dim=1).exp()
-        # ratio2 = ratio2 / (self.sample_action_num - 1)
         ratio2 = logratio2.exp()
         
         return ratio1, ratio2

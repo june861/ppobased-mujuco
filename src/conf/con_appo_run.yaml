@@ -35,7 +35,7 @@ algorithm:
   # Number of mini-batches used during each update
   num_minibatches: 4
   # Number of epochs to update the policy during each training iteration
-  update_epochs: 50
+  update_epochs: 10
   # Whether to normalize advantages
   norm_adv: true
   # PPO clipping coefficient ε1 to limit policy updates

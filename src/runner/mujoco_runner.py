@@ -118,6 +118,5 @@ class MujocoRunner(BaseRunner):
             # if "final_info" in infos:
             #     self.log_episode(infos)
                 
-            for i, info in enumerate(infos):
-                if 'episode' in info:
-                    self.log_episode(infos)
+            if self.next_done.any():
+                self.log_episode(infos)

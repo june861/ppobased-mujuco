@@ -98,8 +98,8 @@ class BaseRunner(ABC):
                 # self.all_args.logger.info(f"Step {self.global_step}: episodic_return = {episodic_return}, episodic_length = {episodic_length}")
         
         # mujoco-v5
-        episodic_return = (infos["episode"]["r"] * infos["episode"]["_r"]).mean()
-        episodic_length = (infos["episode"]["l"] * infos["episode"]["_l"]).mean()
+        episodic_return = np.sum((infos["episode"]["r"] * infos["episode"]["_r"])) / np.sum(infos["episode"]["_r"])
+        episodic_length = np.sum(infos["episode"]["l"] * infos["episode"]["_l"]) / np.sum(infos["episode"]["_l"])
         self.writer.add_scalar("charts/episodic_return", episodic_return, self.global_step)
         self.writer.add_scalar("charts/episodic_length", episodic_length, self.global_step)
         self.writer.add_scalar("charts/global_step", self.global_step)

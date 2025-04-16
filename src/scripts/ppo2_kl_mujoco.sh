@@ -2,8 +2,8 @@
 
 echo "Mujoco Run Scripts"
 exp="mujoco"
-algo="ppo-penalty"
-seeds=(1 2 3)
+algo="ppo2-kl"
+seeds=(1 2 3 4 5)
 update_epochs=(10)
 envs=(
     # vcis 12
@@ -23,9 +23,10 @@ envs=(
     # "InvertedPendulum-v5"
 )
 
+
 # set root dir, it will return "src/" abs path
 PROJECT_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
-CONFIG_PATH="$PROJECT_ROOT/conf/con_ppo1_run.yaml"
+CONFIG_PATH="$PROJECT_ROOT/conf/con_ppo2_kl_run.yaml"
 
 # check config file
 if [ ! -f "$CONFIG_PATH" ]; then
@@ -34,21 +35,17 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 
 
-# 循环遍历每个 seed 值，启动 main.py
+# diff seeds & diff envs
 for env_id in "${envs[@]}"
 do
     for seed in "${seeds[@]}"
     do
         for e in "${update_epochs[@]}"
         do
-            echo "ppo-penalty continous action space"
-            CUDA_VISIBLE_DEVICES=0 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
-
-            # echo "ppo-clip continous action space"
-            # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"
-            # /home/wangchenxu/anaconda3/envs/mujoco_v4/bin/python ./src/algos/mujoco/run.py --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp         
+            echo "ppo-clip continous action space"
+            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo     
         done
-        echo "Experiment with seed=$seed finished."
+        echo "Experiment with env=$env_id seed=$seed finished."
     done
 done
 

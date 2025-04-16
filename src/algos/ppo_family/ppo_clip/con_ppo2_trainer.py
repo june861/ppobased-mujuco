@@ -33,6 +33,7 @@ class Continous_PPO2_Trainer(BaseTrainer):
         ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
+        total_size = 0
         
         for start in range(0, self.batch_size, self.mini_batch_size):
             end = start + self.mini_batch_size
@@ -81,12 +82,21 @@ class Continous_PPO2_Trainer(BaseTrainer):
             entropy_loss = entropy.mean()
             # total loss
             loss = pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef
+
+            # ppo-clip with earlu stop, reference from https://stable-baselines3.readthedocs.io/en/master/_modules/stable_baselines3/ppo/ppo.html#PPO
+            if self.target_kl != None and approx_kl > 1.5 * self.target_kl:
+                grad = None
+                self.logger.warning(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl:.5f}")
+                break        
+    
             # param update
             self.optimizer.zero_grad()
             loss.backward()
             # grad clip
             grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
+            
+            total_size += ratio1.shape[0]
             self.batch_index += 1
     
         # log data for every update_epochs
@@ -95,8 +105,8 @@ class Continous_PPO2_Trainer(BaseTrainer):
             imp_weight_max_ratio1 = max_ratio1,
             imp_weight_min_ratio2 = min_ratio2,
             imp_weight_max_ratio2 = max_ratio2,
-            losses_ratio1_clifracs = ratio1_clipfracs / self.batch_size,
-            losses_ratio2_clifracs = ratio2_clipfracs / self.batch_size,
+            losses_ratio1_clifracs = ratio1_clipfracs / total_size,
+            losses_ratio2_clifracs = ratio2_clipfracs / total_size,
         )
         # last epoch
         if epoch == self.update_epochs - 1:

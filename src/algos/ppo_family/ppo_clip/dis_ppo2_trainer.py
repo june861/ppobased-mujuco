@@ -116,8 +116,6 @@ class Discrete_PPO2_Trainer(BaseTrainer):
                                   
                 yield mini_dict_
             
-            total_size += ratio1.shape[0]
-            
             # ppo-clip with earlu stop, reference from https://stable-baselines3.readthedocs.io/en/master/_modules/stable_baselines3/ppo/ppo.html#PPO
             if self.target_kl != None and approx_kl > 1.5 * self.target_kl:
                 self.logger.warning(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl:.5f}")
@@ -128,6 +126,8 @@ class Discrete_PPO2_Trainer(BaseTrainer):
             loss.backward()
             grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
+            
+            total_size += ratio1.shape[0]
             self.batch_index += 1
 
         dict_ = self.log_dict_(

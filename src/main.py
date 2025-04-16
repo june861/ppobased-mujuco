@@ -31,17 +31,18 @@ if __name__ == "__main__":
         from algos.ppo_family.base.dis_policy_value import Discrete_PolicyValue as Network
         if args.algo == "appo":
             from algos.ppo_family.appo.dis_appo_trainer import Discrete_APPO_Trainer as Trainer
-        elif args.algo == "ppo-clip":
+        elif args.algo == "ppo-clip" or args.algo == "ppo2-kl" or args.algo == "ppo2-ent":
             from algos.ppo_family.ppo_clip.dis_ppo2_trainer import Discrete_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
             from algos.ppo_family.ppo_penalty.dis_ppo1_trainer import Discrete_PPOPenalty_Trainer as Trainer
+        
     elif args.env_type == "mujoco":
         from runner import MujocoRunner as Runner
         from buffer import MujocoBuffer as Buffer
         from algos.ppo_family.base.con_policy_value import Continous_PolicyValue as Network
         if args.algo == "appo":
             from algos.ppo_family.appo.con_appo_trainer import Continous_APPO_Trainer as Trainer
-        elif args.algo == "ppo-clip":
+        elif args.algo == "ppo-clip" or args.algo == "ppo2-kl" or args.algo == "ppo2-ent":
             from algos.ppo_family.ppo_clip.con_ppo2_trainer import Continous_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
             from algos.ppo_family.ppo_penalty.con_ppo1_trainer import Continous_PPOPenalty_Trainer as Trainer

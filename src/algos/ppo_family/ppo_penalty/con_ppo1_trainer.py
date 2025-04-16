@@ -33,6 +33,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
         ratio1_clipfracs, ratio2_clipfracs = 0.0, 0.0
         min_ratio1, max_ratio1 =  10.0, 0.0
         min_ratio2, max_ratio2 = 10.0, 0.0
+        total_size = 0
         
         for start in range(0, self.batch_size, self.mini_batch_size):
             end = start + self.mini_batch_size
@@ -48,6 +49,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             new_mean = new_mean_std.loc
             new_std = new_mean_std.scale
             kl = compute_kld(b_means[mb_inds], b_stds[mb_inds], new_mean, new_std).mean()
+
             
             mb_advantages = b_advantages[mb_inds]
             if self.norm_adv:
@@ -61,12 +63,6 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             entropy_loss = entropy.mean()
             # total loss
             loss = pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef
-            # param update
-            self.optimizer.zero_grad()
-            loss.backward()
-            # grad clip
-            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
-            self.optimizer.step()
             
             with torch.no_grad():
                 # calculate approx_kl http://joschu.net/blog/kl-approx.html
@@ -88,7 +84,20 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                     losses_penalty_coef = self.penalty_coef,
                 )
                 yield mini_dict_
+
+            if self.target_kl != None and kl > 4 * self.target_kl:
+                # this in google's paper
+                grad = None
+                break
+
+            # param update
+            self.optimizer.zero_grad()
+            loss.backward()
+            # grad clip
+            grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
+            self.optimizer.step()
             
+            total_size += ratio1.shape[0]
             self.batch_index += 1
 
    
@@ -99,30 +108,34 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             imp_weight_max_ratio1 = max_ratio1,
             imp_weight_min_ratio2 = min_ratio2,
             imp_weight_max_ratio2 = max_ratio2,
-            losses_ratio1_clifracs = ratio1_clipfracs / self.batch_size,
-            losses_ratio2_clifracs = ratio2_clipfracs / self.batch_size,
-            losses_penalty_coef = self.penalty_coef,
+            losses_ratio1_clifracs = ratio1_clipfracs / total_size,
+            losses_ratio2_clifracs = ratio2_clipfracs / total_size,
         )
         # last epoch
         if epoch == self.update_epochs - 1:
+            yield {"kl": kl.mean()}
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-            final_dict_ = self.log_dict_(
-                    losses_pg_loss_1 = pg_loss_1,
-                    losses_pg_loss_2 = pg_loss_2,
-                    losses_pg_loss = pg_loss.item(),
-                    losses_grad_norm = grad,
-                    losses_entropy = entropy_loss.item(),
-                    losses_explained_variance = explained_var,
-                )
-            dict_ = {**dict_, **final_dict_}
-        
-        # dynamic adjust penalty coefficience
-        if kl > 1.5 * self.target_kl:
-            self.penalty_coef *= 2
-        elif kl < self.target_kl / 1.5:
-            self.penalty_coef /= 2     
+            if grad != None:
+                final_dict_ = self.log_dict_(
+                        losses_pg_loss_1 = pg_loss_1,
+                        losses_pg_loss_2 = pg_loss_2,
+                        losses_pg_loss = pg_loss.item(),
+                        losses_grad_norm = grad,
+                        losses_entropy = entropy_loss.item(),
+                        losses_explained_variance = explained_var,
+                    )
+            else:
+                final_dict_ = self.log_dict_(
+                        losses_pg_loss_1 = pg_loss_1,
+                        losses_pg_loss_2 = pg_loss_2,
+                        losses_pg_loss = pg_loss.item(),
+                        losses_entropy = entropy_loss.item(),
+                        losses_explained_variance = explained_var,
+                    )
+            
+            dict_ = {**dict_, **final_dict_}    
     
         yield dict_            
     
@@ -140,7 +153,16 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
         for epoch in range(self.update_epochs):
             np.random.shuffle(b_inds)
             for dict_ in self.ppo_update(data = data, b_inds = b_inds, epoch = epoch):
-                yield dict_         
+                if "kl" in dict_:
+                    # dynamic adjust penalty coefficience
+                    kl = dict_["kl"]
+                    if kl > 1.5 * self.target_kl:
+                        self.penalty_coef *= 2
+                    elif kl < self.target_kl / 1.5:
+                        self.penalty_coef /= 2
+                    yield {"charts/kl_coef": self.penalty_coef}
+                else:
+                    yield dict_         
 
     def compute_policy_loss(self, mb_advantages, ratio1, kl):
         """ compute policy loss

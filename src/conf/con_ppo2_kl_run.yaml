@@ -9,7 +9,7 @@ experiment:
   # Enable tracking with Weights and Biases (wandb)
   track: true
   # Name of the wandb project
-  wandb_project_name: "cleanrl-mujocov5_v1"
+  wandb_project_name: "cleanrl-mujoco_debbugger"
   # Whether to capture video of the agent's performance (stored in `videos` folder)
   capture_video: false
 
@@ -52,12 +52,19 @@ algorithm:
   max_grad_norm: !!float 0.5
   # Target KL divergence threshold; if exceeded, training stops early
   target_kl: !!float 0.01  # YAML does not support None, hence use 0.0
-  # KL divergence coefficence; 
-  penalty_coef: !!float 0.5
+
+# ===========================
+# 🕹️ Runtime Configuration
+# ===========================
+runtime:
+  # Batch size, computed dynamically during runtime
+  batch_size: 0
+  # Mini-batch size, computed dynamically during runtime
+  minibatch_size: 0
+  # Number of training iterations, computed dynamically during runtime
+  num_iterations: 0
   # decay delta
   decay_delta: !!float 1.0
-
-
 # ===========================
 # 🎲 Action Sample Configuration
 # ===========================

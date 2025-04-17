@@ -73,6 +73,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)
                 ratio1_clipfracs += (torch.abs(ratio1.detach().cpu() - 1.0) < self.clip_coef).float().sum()
                 ratio2_clipfracs += (torch.abs(ratio2.detach().cpu() - 1.0) < self.clip_coef).float().sum()
+                total_size += ratio1.shape[0]
                 
                 # log data for every mini-batch data                    
                 mini_dict_ =  self.log_dict_(
@@ -83,6 +84,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                     imp_weight_ratio2 = np.mean(ratio2.detach().cpu().numpy()),
                     losses_penalty_coef = self.penalty_coef,
                 )
+                
                 yield mini_dict_
 
             if self.target_kl != None and kl > 4 * self.target_kl:
@@ -96,8 +98,6 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
             # grad clip
             grad = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
             self.optimizer.step()
-            
-            total_size += ratio1.shape[0]
             self.batch_index += 1
 
    
@@ -182,7 +182,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
         # diff from PPO2: add KL loss
         pg_loss = pg_loss_1 + self.penalty_coef * kl
         
-        return pg_loss, pg_loss_1.item(), 0.0
+        return pg_loss, pg_loss_1.item(), self.penalty_coef * kl
      
     
      

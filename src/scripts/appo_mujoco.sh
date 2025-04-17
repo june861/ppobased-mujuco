@@ -16,6 +16,7 @@ envs=(
     "Ant-v5"
 
     # vcis 13
+    # "Pusher-v5"
     # "Hopper-v5"
     # "Reacher-v5"
     # "Walker2d-v5"

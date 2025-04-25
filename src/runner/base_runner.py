@@ -54,7 +54,7 @@ class BaseRunner(ABC):
         if self.all_args.track:
             wandb.init(
                 project=self.all_args.wandb_project_name,
-                group=self.all_args.exp_name + "_pi_old_1",
+                group=self.all_args.exp_name + "_pi_old_2",
                 sync_tensorboard=True,
                 config=vars(self.all_args),
                 name=self.run_name,

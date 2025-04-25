@@ -197,16 +197,16 @@ class Continous_APPO_Trainer(BaseTrainer):
         # pg_loss_2 = (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
         
         # new version: add action
+        pg_loss1 = -mb_advantages * ratio1
+        pg_loss2 = -mb_advantages * torch.clamp(ratio1, (1 - self.clip_coef), (1 + self.clip_coef))
+        pg_loss_1 = torch.max(pg_loss1, pg_loss2).mean()
+        
         mb_old_logprobs = kwargs["mb_old_logprobs"]
         new_logprobs = kwargs["new_logprobs"]
         ratios = (new_logprobs - mb_old_logprobs).exp()
         pg_loss_2 = (0.5 * mb_old_logprobs.exp() * (ratios - 1)**2).mean()
-        pg_loss_1 = (-mb_advantages * ratio1).mean()
-        
-        pg_loss = (pg_loss_1 + pg_loss_2).mean()
-        # pg_loss_2 = (0.5 * mb_old_logprobs[:,1:].exp() * (ratio2 - 1)**2).mean()
-        
         pg_loss = pg_loss_1  +  pg_loss_2
+        
         return pg_loss, pg_loss_1.item(), pg_loss_2.item()
         
     

@@ -46,6 +46,8 @@ if __name__ == "__main__":
             from algos.ppo_family.ppo_clip.con_ppo2_trainer import Continous_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
             from algos.ppo_family.ppo_penalty.con_ppo1_trainer import Continous_PPOPenalty_Trainer as Trainer
+        elif args.algo == "spo":
+            from algos.ppo_family.spo.con_spo_trainer import Continous_SPO_Trainer as Trainer
     else:
         args.logger.error(f"env_type:{args.env_type} hasn't not yet implemented! Only Support ['mujoco', 'atari]")
         sys.exit({"ExitCode": 1, "ErrorType": "NotImplementedError"})

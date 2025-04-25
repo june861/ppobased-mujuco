@@ -3,24 +3,27 @@
 exp="atari"
 seeds=(1 2 3)
 update_epochs=(4)
-algo="appo"
+algo="ppo-penalty"
 envs=(
+    # VCIS 12
+    "ALE/Alien-v5"
     "ALE/Assault-v5"
-    # "ALE/Alien-v5"
-    # "ALE/Amidar-v5"
-    # "ALE/Asterix-v5"
-    # "ALE/Asteroids-v5"
-    # "ALE/Atlantis-v5"
-    # "ALE/BankHeist-v5"
-    # "ALE/BattleZone-v5"
-    # "ALE/BeamRider-v5"
-    # "ALE/Berzerk-v5"
-    # "ALE/Bowling-v5"
-    # "ALE/Boxing-v5"
-    # "ALE/Breakout-v5"
-    # "ALE/Centipede-v5"
-    # "ALE/ChopperCommand-v5"
-    # "ALE/CrazyClimber-v5"
+    "ALE/Asteroids-v5"
+    "ALE/Amidar-v5"
+    "ALE/Asterix-v5"
+    "ALE/Atlantis-v5"
+    "ALE/BankHeist-v5"
+    "ALE/Breakout-v5"
+    "ALE/BattleZone-v5"
+    "ALE/BeamRider-v5"
+    "ALE/Berzerk-v5"
+    "ALE/Bowling-v5"
+    "ALE/Boxing-v5"
+    "ALE/Centipede-v5"
+    "ALE/ChopperCommand-v5"
+    "ALE/CrazyClimber-v5"
+
+    # VCIS 13
     # "ALE/DemonAttack-v5"
     # "ALE/DoubleDunk-v5"
     # "ALE/Enduro-v5"
@@ -28,7 +31,7 @@ envs=(
     # "ALE/Freeway-v5"
     # "ALE/Frostbite-v5"
     # "ALE/Gopher-v5"
-    # "GravitarNoFrameskip-v4"
+    # "ALE/Gravitar-v5"
     # "ALE/Hero-v5"
     # "ALE/IceHockey-v5"
     # "ALE/Jamesbond-v5"
@@ -41,6 +44,8 @@ envs=(
     # "ALE/Phoenix-v5"
     # "ALE/Pitfall-v5"
     # "ALE/Pong-v5"
+
+
     # "ALE/PrivateEye-v5"
     # "ALE/Qbert-v5"
     # "ALE/Riverraid-v5"
@@ -58,12 +63,11 @@ envs=(
     # "ALE/WizardOfWor-v5"
     # "ALE/YarsRevenge-v5"
     # "ALE/Zaxxon-v5"
-
 )
 
 # set root dir, it will return "src/" abs path
 PROJECT_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
-CONFIG_PATH="$PROJECT_ROOT/conf/dis_exp_run.yaml"
+CONFIG_PATH="$PROJECT_ROOT/conf/dis_ppo1_run.yaml"
 
 # check config file
 if [ ! -f "$CONFIG_PATH" ]; then

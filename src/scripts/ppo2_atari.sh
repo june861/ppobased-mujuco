@@ -1,66 +1,70 @@
-#!/bin/bash
+#!binbash
 
 exp="atari"
-seeds=(1)
+seeds=(1 2 3)
 update_epochs=(4)
 algo="ppo-clip"
 envs=(
-    "AssaultNoFrameskip-v4"
-    "AlienNoFrameskip-v4"
-    "AmidarNoFrameskip-v4"
-    # "AsterixNoFrameskip-v4"
-    # "AsteroidsNoFrameskip-v4"
-    # "AtlantisNoFrameskip-v4"
-    # "BankHeistNoFrameskip-v4"
-    # "BattleZoneNoFrameskip-v4"
-    # "BeamRiderNoFrameskip-v4"
-    # "BerzerkNoFrameskip-v4"
-    # "BowlingNoFrameskip-v4"
-    # "BoxingNoFrameskip-v4"
-    # "BreakoutNoFrameskip-v4"
-    # "CentipedeNoFrameskip-v4"
-    # "ChopperCommandNoFrameskip-v4"
-    # "CrazyClimberNoFrameskip-v4"
-    # "DemonAttackNoFrameskip-v4"
-    # "DoubleDunkNoFrameskip-v4"
-    # "EnduroNoFrameskip-v4"
-    # "FishingDerbyNoFrameskip-v4"
-    # "FreewayNoFrameskip-v4"
-    # "FrostbiteNoFrameskip-v4"
-    # "GopherNoFrameskip-v4"
-    # "GravitarNoFrameskip-v4"
-    # "HeroNoFrameskip-v4"
-    # "IceHockeyNoFrameskip-v4"
-    # "JamesbondNoFrameskip-v4"
-    # "KangarooNoFrameskip-v4"
-    # "KrullNoFrameskip-v4"
-    # "KungFuMasterNoFrameskip-v4"
-    # "MontezumaRevengeNoFrameskip-v4"
-    # "MsPacmanNoFrameskip-v4"
-    # "NameThisGameNoFrameskip-v4"
-    # "PhoenixNoFrameskip-v4"
-    # "PitfallNoFrameskip-v4"
-    # "PongNoFrameskip-v4"
-    # "PrivateEyeNoFrameskip-v4"
-    # "QbertNoFrameskip-v4"
-    # "RiverraidNoFrameskip-v4"
-    # "RoadRunnerNoFrameskip-v4"
-    # "RobotankNoFrameskip-v4"
-    # "SeaquestNoFrameskip-v4"
-    # "SpaceInvadersNoFrameskip-v4"
-    # "StarGunnerNoFrameskip-v4"
-    # "TennisNoFrameskip-v4"
-    # "TimePilotNoFrameskip-v4"
-    # "TutankhamNoFrameskip-v4"
-    # "UpNDownNoFrameskip-v4"
-    # "VentureNoFrameskip-v4"
-    # "VideoPinballNoFrameskip-v4"
-    # "WizardOfWorNoFrameskip-v4"
-    # "YarsRevengeNoFrameskip-v4"
-    # "ZaxxonNoFrameskip-v4"
+    # VCIS 12
+    "ALE/Assault-v5"
+    "ALE/Alien-v5"
+    "ALE/Amidar-v5"
+    "ALE/Asterix-v5"
+    "ALE/Asteroids-v5"
+    "ALE/Atlantis-v5"
+    "ALE/BankHeist-v5"
+    "ALE/BattleZone-v5"
+    "ALE/BeamRider-v5"
+    "ALE/Berzerk-v5"
+    "ALE/Bowling-v5"
+    "ALE/Boxing-v5"
+    "ALE/Breakout-v5"
+    "ALE/Centipede-v5"
+    "ALE/ChopperCommand-v5"
+    "ALE/CrazyClimber-v5"
+
+    # 
+    # "ALE/DemonAttack-v5"
+    # "ALE/DoubleDunk-v5"
+    # "ALE/Enduro-v5"
+    # "ALE/FishingDerby-v5"
+    # "ALE/Freeway-v5"
+    # "ALE/Frostbite-v5"
+    # "ALE/Gopher-v5"
+    # "ALE/Gravitar-v5"
+    # "ALE/Hero-v5"
+    # "ALE/IceHockey-v5"
+    # "ALE/Jamesbond-v5"
+    # "ALE/Kangaroo-v5"
+    # "ALE/Krull-v5"
+    # "ALE/KungFuMaster-v5"
+    # "ALE/MontezumaRevenge-v5"
+    # "ALE/MsPacman-v5"
+    # "ALE/NameThisGame-v5"
+    # "ALE/Phoenix-v5"
+    # "ALE/Pitfall-v5"
+    # "ALE/Pong-v5"
+    # "ALE/PrivateEye-v5"
+    # "ALE/Qbert-v5"
+    # "ALE/Riverraid-v5"
+    # "ALE/RoadRunner-v5"
+    # "ALE/Robotank-v5"
+    # "ALE/Seaquest-v5"
+    # "ALE/SpaceInvaders-v5"
+    # "ALE/StarGunner-v5"
+    # "ALE/Tennis-v5"
+    # "ALE/TimePilot-v5"
+    # "ALE/Tutankham-v5"
+    # "ALE/UpNDown-v5"
+    # "ALE/Venture-v5"
+    # "ALE/VideoPinball-v5"
+    # "ALE/WizardOfWor-v5"
+    # "ALE/YarsRevenge-v5"
+    # "ALE/Zaxxon-v5"
+
 )
 
-# set root dir, it will return "src/" abs path
+# set root dir, it will return "src" abs path
 PROJECT_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 CONFIG_PATH="$PROJECT_ROOT/conf/dis_exp_run.yaml"
 
@@ -77,11 +81,11 @@ do
     do
         for e in "${update_epochs[@]}"
         do
-            CUDA_VISIBLE_DEVICES=5,6,7 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
+            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp --algo $algo
 
             # echo "ppo-clip continous action space"
-            # ppoclip_yaml="/home/wangchenxu/ppobased-mujuco/src/conf/con_ppoclip_run.yaml"
-            # /home/wangchenxu/anaconda3/envs/mujoco_v4/bin/python ./src/algos/mujoco/run.py --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp         
+            # ppoclip_yaml="homewangchenxuppobased-mujucosrcconfcon_ppoclip_run.yaml"
+            # homewangchenxuanaconda3envsmujoco_-v4binpython .srcalgosmujocorun.py --seed $seed  --yaml $appo_yaml --env_id $env_id --env_type $exp         
         done
         echo "Experiment with env_id=$env_id seed=$seed finished."
     done

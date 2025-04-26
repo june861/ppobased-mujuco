@@ -24,7 +24,13 @@ class MujocoRunner(BaseRunner):
                 env = gym.make(self.all_args.env_id, render_mode="rgb_array")
                 env = gym.wrappers.RecordVideo(env, f"videos/{self.run_name}")
             else:
-                env = gym.make(self.all_args.env_id)
+                if self.all_args.env_id == "Pusher-v5":
+                    custom_max_steps = 1000
+                    env = gym.make(self.all_args.env_id, max_episode_steps = custom_max_steps)
+                else:
+                    env = gym.make(self.all_args.env_id)
+            
+                # env = gym.wrappers.TimeLimit(env.env, max_episode_steps = custom_max_steps)
             env = gym.wrappers.FlattenObservation(env)  # deal with dm_control's Dict observation space
             env = gym.wrappers.RecordEpisodeStatistics(env)
             env = gym.wrappers.ClipAction(env)
@@ -118,5 +124,5 @@ class MujocoRunner(BaseRunner):
             # if "final_info" in infos:
             #     self.log_episode(infos)
                 
-            if self.next_done.any():
+            if "episode" in infos:
                 self.log_episode(infos)

@@ -44,11 +44,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 mb_logprobs = b_logprobs[mb_inds]
             )
             logratio1 = ratio1.log()
-            
-            # use mean and std to calculate kl loss
-            new_mean = new_mean_std.loc
-            new_std = new_mean_std.scale
-            kl = compute_kld(b_means[mb_inds], b_stds[mb_inds], new_mean, new_std).mean()
+            approx_kl = ((ratio1 - 1) - logratio1).mean()
 
             
             mb_advantages = b_advantages[mb_inds]
@@ -56,7 +52,7 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
             # Policy loss
-            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, kl = kl)
+            pg_loss, pg_loss_1, pg_loss_2 = self.compute_policy_loss(mb_advantages = mb_advantages, ratio1 = ratio1, kl = approx_kl)
             # value loss
             v_loss = self.compute_value_loss(mb_returns = b_returns[mb_inds], mb_values = b_values[mb_inds], newvalue = newvalue)
             # entropy loss
@@ -68,6 +64,12 @@ class Continous_PPOPenalty_Trainer(BaseTrainer):
                 # calculate approx_kl http://joschu.net/blog/kl-approx.html
                 old_approx_kl = (-logratio1).mean()
                 approx_kl = ((ratio1 - 1) - logratio1).mean()
+                
+                # use mean and std to calculate kl loss
+                new_mean = new_mean_std.loc
+                new_std = new_mean_std.scale
+                kl = compute_kld(b_means[mb_inds], b_stds[mb_inds], new_mean, new_std).mean()
+                
                 # ratios family
                 min_ratio1, max_ratio1 = min(np.min(ratio1.detach().cpu().numpy()), min_ratio1), max(np.max(ratio1.detach().cpu().numpy()), max_ratio1)
                 min_ratio2, max_ratio2 = min(np.min(ratio2.detach().cpu().numpy()), min_ratio2), max(np.max(ratio2.detach().cpu().numpy()), max_ratio2)

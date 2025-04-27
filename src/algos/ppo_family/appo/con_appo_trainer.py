@@ -199,7 +199,7 @@ class Continous_APPO_Trainer(BaseTrainer):
         mb_old_logprobs = kwargs["mb_old_logprobs"]
         new_logprobs = kwargs["new_logprobs"]
         ratios = (new_logprobs - mb_old_logprobs).exp()
-        pg_loss_2 = (0.5 * (ratio1 - 1)**2).mean()
+        pg_loss_2 = (0.5 * (ratios - 1)**2).mean()
 
         pg_loss = pg_loss_1  +  pg_loss_2
         

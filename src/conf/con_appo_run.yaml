@@ -61,7 +61,7 @@ algorithm:
 # ===========================
 action_sample:
   # Number of actions to sample per step
-  sample_action_num: 4
+  sample_action_num: 2
   # ratio2 require grad
   # require_grad: True
 

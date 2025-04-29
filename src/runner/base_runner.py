@@ -50,11 +50,11 @@ class BaseRunner(ABC):
     def setup_logging(self):
         """Setup wandb and TensorBoard logging."""
         self.run_name = f"{self.all_args.exp_name}_seed{self.all_args.seed}_{int(time.time())}_{os.getppid()}"
-        self.all_args.logger.info(f"wandb project is {self.all_args.wandb_project_name}, run name is {self.run_name}, group name is {self.all_args.exp_name  + '_pi_old_1'}!")
+        self.all_args.logger.info(f"wandb project is {self.all_args.wandb_project_name}, run name is {self.run_name}, group name is {self.all_args.exp_name  + '_pi_old'}!")
         if self.all_args.track:
             wandb.init(
                 project=self.all_args.wandb_project_name,
-                group=self.all_args.exp_name + "_pi_old_3",
+                group=self.all_args.exp_name + "_pi_old",
                 sync_tensorboard=True,
                 config=vars(self.all_args),
                 name=self.run_name,
